@@ -593,7 +593,7 @@ static void render_list(const PlayerInfo* pi) {
         if (y < LIST_Y - ROW_H || y > SCR_H) continue;
         bool sel = k == g_cur, play = i == g_playing;
         if (!sel) C2D_DrawRectSolid(14, y + ROW_H - 1, 0, 292, 1, COL_LINE);
-        char num[8], host[32];
+        char num[12], host[32];
         snprintf(num, sizeof(num), "%02d", i + 1);
         if (sel) { C2D_DrawRectSolid(16, y + 6, 0, 18, 13, COL_ACC); mono_draw(num, 25, y + 9, 1, COL_BLACK, 1); }
         else mono_draw(num, 25, y + 9, 1, COL_DIM, 1);
