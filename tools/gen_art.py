@@ -1,4 +1,4 @@
-# Generates meta/icon.png (48x48), meta/banner.png (256x128), meta/banner.wav
+# Generates meta/icon.png (48x48) and meta/banner.png (256x128). The banner sound is tools/gen_banner_wav.py
 # Cyberpunk HUD style: carbon black, acid yellow #FCEE0A accent, small red alert.
 import math, struct, wave, random, sys
 from PIL import Image, ImageDraw, ImageFont
@@ -73,17 +73,5 @@ d.text((246*S,68*S),"無線",font=ImageFont.truetype(CJK_B,22*S),fill=(48,46,8),
 scan(im,S)
 im.resize((W,H),Image.LANCZOS).save("meta/banner.png")
 
-# ---------- banner sound: short digital boot blips (22050 Hz mono)
-sr=22050; out=[]
-def tone(f,dur,vol=0.5,sq=True):
-    n=int(sr*dur)
-    for k in range(n):
-        t=k/sr; env=min(1,k/80)*math.exp(-t*10)
-        v=(1 if math.sin(2*math.pi*f*t)>0 else -1) if sq else math.sin(2*math.pi*f*t)
-        out.append(v*env*vol)
-def sil(d): out.extend([0.0]*int(sr*d))
-for f in (1760,0,1760,0,2349): (tone(f,0.05,0.35) if f else sil(0.04))
-sil(0.12); tone(880,0.5,0.4,sq=False); sil(0.6)
-w=wave.open("meta/banner.wav","wb"); w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
-w.writeframes(b"".join(struct.pack("<h",int(max(-1,min(1,v))*30000)) for v in out)); w.close()
+print("ok")
 print("ok")
