@@ -23,6 +23,7 @@
 #include "config.h"
 #include "i18n.h"
 #include "netlog.h"
+#include "app.h"
 
 #define TOP_W 400
 #define BOT_W 320
@@ -66,8 +67,6 @@ typedef struct { float x, y, t0; bool on; } Lock;
 static Lock g_lock[6];
 
 /* --------------------------------------------------------------- helpers */
-static u32 url_hash(const char* s) { u32 h = 2166136261u; while (*s) { h ^= (u8)*s++; h *= 16777619u; } return h; }
-
 static void url_host(const char* url, char* out, size_t n) {
     const char* p = strstr(url, "://");
     p = p ? p + 3 : url;
@@ -76,8 +75,6 @@ static void url_host(const char* url, char* out, size_t n) {
     out[i] = 0;
     if (i > 20) { out[18] = '.'; out[19] = '.'; out[20] = 0; }
 }
-
-static float fake_freq(int i) { return 76.1f + i * 0.9f; }
 
 static void add_lock(float x, float y) {
     for (int i = 0; i < 6; i++) if (!g_lock[i].on) { g_lock[i] = (Lock){ x, y, g_t, true }; return; }
@@ -117,12 +114,11 @@ static void star(float cx, float cy, float r, bool filled, u32 c) {
 
 /* translatable label: ASCII -> HUD mono font, anything else (accents, kana/kanji) -> system font
    scaled to the same visual size. */
-static bool is_ascii(const char* s) { while (*s) if ((u8)*s++ >= 0x80) return false; return true; }
 static float lbl(const char* s, float x, float y, int sc, u32 col, int align) {
-    if (is_ascii(s)) return mono_draw(s, x, y, sc, col, align);
+    if (mono_ok(s)) return mono_draw(s, x, y, sc, col, align);
     return text_draw(s, x, y - (sc == 2 ? 4 : 3), sc == 2 ? 0.6f : 0.42f, col, align);
 }
-static float lbl_width(const char* s, int sc) { return is_ascii(s) ? mono_width(s, sc) : text_width(s, sc == 2 ? 0.6f : 0.42f); }
+static float lbl_width(const char* s, int sc) { return mono_ok(s) ? mono_width(s, sc) : text_width(s, sc == 2 ? 0.6f : 0.42f); }
 static const char* acc_name(int k) { return T((StrId)(S_ACC0 + k)); }
 
 /* toggle switch */
@@ -307,12 +303,18 @@ static void draw_footer(const PlayerInfo* pi) {
     seg_bar(206, 209, 10, 4, 1, 6, pi->bufferPct / 100.0f, COL_ACC, COL_LINE);
     snprintf(b, sizeof(b), "DSP:%s", dspfw_source_name(g_fw));
     mono_draw(b, 370, 208, 1, g_fw == FW_NONE ? COL_RED : COL_DIM, 2);
-    /* hex ticker */
-    char hx[80]; int o = 0;
-    unsigned seed = (unsigned)(g_t * 6);
-    for (int i = 0; i < 12 && o < 70; i++) { seed = seed * 1103515245u + 12345u; o += snprintf(hx + o, sizeof(hx) - o, "%02X ", (seed >> 16) & 0xFF); }
+    /* hex ticker: the real bytes arriving from the station, refreshed 6 times a second */
+    static char hx[48] = "-- -- -- -- -- -- -- -- -- -- -- --";
+    static int tick = -1;
+    if ((int)(g_t * 6) != tick) {
+        tick = (int)(g_t * 6);
+        unsigned char b[12] = { 0 };
+        int k = pi->state == PS_PLAYING ? player_peek_stream(b, 12) : 0, o = 0;
+        for (int i = 0; i < 12; i++) o += snprintf(hx + o, sizeof(hx) - o, i < k ? "%02X " : "-- ", b[i]);
+    }
     mono_draw(hx, 30, 220, 1, col_a(COL_DIM, 0.45f), 0);
-    mono_draw("JP//NET", 370, 220, 1, col_a(COL_DIM, 0.45f), 2);
+    /* signature */
+    mono_draw("//VENOMSHiNE", 370, 220, 1, col_a(COL_ACC, 0.6f), 2);
 }
 
 static void render_top(const PlayerInfo* pi) {
@@ -331,7 +333,7 @@ static void render_top(const PlayerInfo* pi) {
     C2D_DrawLine(386, 236, COL_ACC, 396, 226, COL_ACC, 2, 0);
     /* header */
     mono_draw("RADIO//NEON", 18, 10, 1, COL_ACC, 0);
-    mono_draw("V1 JP-NET", 88, 10, 1, COL_DIM, 0);
+    mono_draw("V" APP_VERSION " JP-NET", 88, 10, 1, COL_DIM, 0);
     time_t now = time(NULL);
     struct tm* tm = localtime(&now);
     char clk[16];
@@ -346,8 +348,8 @@ static void render_top(const PlayerInfo* pi) {
     snprintf(ch, sizeof(ch), "CH.%02d", idx + 1);
     mono_draw(ch, 30, 31, 2, COL_ACC, 0);
     if (g_stationCount) {
-        snprintf(id, sizeof(id), "ID 0x%06lX", (unsigned long)(url_hash(g_stations[idx].url) & 0xFFFFFF));
-        snprintf(fq, sizeof(fq), "FM %05.1f  %02d/%02d", fake_freq(idx), idx + 1, g_stationCount);
+        url_host(g_stations[idx].url, id, sizeof(id));
+        snprintf(fq, sizeof(fq), "%02d/%02d // %s", idx + 1, g_stationCount, strncmp(g_stations[idx].url, "https", 5) ? "HTTP" : "HTTPS");
         mono_draw(id, 96, 31, 1, COL_DIM, 0);
         mono_draw(fq, 96, 40, 1, COL_DIM, 0);
     }
@@ -418,14 +420,45 @@ static void icon_playstop(float cx, float cy, float m, u32 c) {
     C2D_DrawTriangle(bx, by, c, c2x, c2y, c, c1x, c1y, c, 0);
 }
 
+static bool g_mcuOk = false;
+
+/* 5 squares = 20 % each (1-20 % -> 1 ... 81-100 % -> 5); low under 15 %. Read every 5 s.
+   Exact % from mcu::HWC; without it (some .3dsx launchers) the 0-5 level of ptm. */
+static int battery_squares(bool* charging, bool* low) {
+    static u64 last = 0;
+    static int sq = 5;
+    static bool chg = false, lo = false;
+    u64 now = osGetTime();
+    if (!last || now - last > 5000) {
+        last = now;
+        u8 pct = 0, lv = 0, c = 0;
+        if (g_mcuOk && R_SUCCEEDED(MCUHWC_GetBatteryLevel(&pct))) {
+            if (pct > 100) pct = 100;
+            sq = (pct + 19) / 20;
+            lo = pct < 15;
+        } else if (R_SUCCEEDED(PTMU_GetBatteryLevel(&lv))) {
+            sq = lv > 5 ? 5 : lv;
+            lo = lv <= 1;
+        }
+        if (R_SUCCEEDED(PTMU_GetBatteryChargeState(&c))) chg = c != 0;
+    }
+    *charging = chg; *low = lo;
+    return sq;
+}
+
 static void bottom_header(const char* title) {
     mono_draw(title, 12, 8, 1, COL_ACC, 0);
     u8 ws = osGetWifiStrength();
     mono_draw("NET", 222, 8, 1, COL_DIM, 0);
     for (int i = 0; i < 3; i++) C2D_DrawRectSolid(242 + i * 5, 15 - (3 + i * 2), 0, 3, 3 + i * 2, i < ws ? COL_ACC : COL_LINE);
-    u8 bat = 0; PTMU_GetBatteryLevel(&bat);
-    mono_draw("BAT", 264, 8, 1, COL_DIM, 0);
-    seg_bar(284, 9, 5, 4, 1, 6, bat / 5.0f, bat <= 1 ? COL_RED : COL_ACC, COL_LINE);
+    bool chg, low;
+    int sq = battery_squares(&chg, &low);
+    u32 on = low && !chg ? COL_RED : COL_ACC;
+    mono_draw("BAT", 264, 8, 1, chg ? COL_ACC : COL_DIM, 0);
+    for (int i = 0; i < 5; i++) {
+        bool lit = i < sq || (chg && i == sq && fmodf(g_t, 1.0f) < 0.5f);
+        C2D_DrawRectSolid(284 + i * 5, 9, 0, 4, 6, lit ? on : COL_LINE);
+    }
 }
 
 /* header used by the sub screens: back button, title, kanji, right label */
@@ -449,14 +482,18 @@ static void render_controls(const PlayerInfo* pi) {
     Btn* c = &B_CARD;
     ch_fill(c->x, c->y, c->w, c->h, 8, CUT_TL | CUT_BR, COL_PANEL);
     ch_outline(c->x, c->y, c->w, c->h, 8, CUT_TL | CUT_BR, COL_LINE, 1);
-    edge_trace(c->x, c->y, c->w, c->h, 8, CUT_TL | CUT_BR, g_t / 7.0f, 46, COL_ACC);
+    bool live = g_sel == g_playing && pi->state == PS_PLAYING;
+    if (live) edge_trace(c->x, c->y, c->w, c->h, 8, CUT_TL | CUT_BR, g_t / 7.0f, 46, COL_ACC);   /* only while on air */
     if (g_stationCount) {
         char ch[24], fq[24], host[32];
         snprintf(ch, sizeof(ch), "CH %02d/%02d", g_sel + 1, g_stationCount);
         mono_draw(ch, c->x + 12, c->y + 7, 1, COL_ACC, 0);
-        snprintf(fq, sizeof(fq), "FM %05.1f", fake_freq(g_sel));
+        if (live && pi->codec[0]) {
+            if (pi->bitrate > 0) snprintf(fq, sizeof(fq), "%s %dK", pi->codec, pi->bitrate);
+            else snprintf(fq, sizeof(fq), "%s", pi->codec);
+        } else snprintf(fq, sizeof(fq), "%s", strncmp(g_stations[g_sel].url, "https", 5) ? "HTTP" : "HTTPS");
         mono_draw(fq, c->x + 70, c->y + 7, 1, COL_DIM, 0);
-        if (g_sel == g_playing && pi->state == PS_PLAYING) {
+        if (live) {
             ch_fill(c->x + c->w - 44, c->y + 5, 34, 11, 3, CUT_TL | CUT_BR, COL_RED);
             mono_draw("LIVE", c->x + c->w - 27, c->y + 7, 1, COL_TEXT, 1);
         }
@@ -589,7 +626,7 @@ static const char* MENU_KANJI[NMENU] = { "放送局", "お気に入り", "設定
 
 static void render_menu(void) {
     spring_to(g_menuCur * MENU_H);
-    sub_header("MENU//SYS", "メニュー", "V1.0");
+    sub_header("MENU//SYS", "メニュー", "V" APP_VERSION);
     dashed_vline(5, LIST_Y, SCR_H, 3, 3, COL_LINE);
     float hy = MENU_Y + g_selY;
     C2D_DrawRectSolid(4, hy + 8, 0, 3, MENU_H - 20, COL_ACC);
@@ -1111,6 +1148,7 @@ int main(int argc, char** argv) {
     ptmuInit();
     cfguInit();
     gspLcdInit();
+    g_mcuOk = R_SUCCEEDED(mcuHwcInit());
     gfxInitDefault();
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE * 2);
     C2D_Init(C2D_DEFAULT_MAX_OBJECTS * 4);
@@ -1181,6 +1219,7 @@ int main(int argc, char** argv) {
     C3D_Fini();
     gfxExit();
     gspLcdExit();
+    if (g_mcuOk) mcuHwcExit();
     cfguExit();
     ptmuExit();
     romfsExit();

@@ -17,8 +17,8 @@ const AccentPreset ACCENTS[NUM_ACCENTS] = {
     { "CIAN",             0, 240, 255 },
     { "MAGENTA",        255,  43, 214 },
     { "VERDE NEON",      57, 255,  20 },
-    { "NARANJA",        255, 138,   0 },
-    { "ROJO",           255,  64,  48 },
+    { "MORADO UV",      138,  43, 255 },
+    { "ROJO",           244,   0,   9 },   /* Coca-Cola red #F40009 */
 };
 
 Config g_cfg = { 0, true, true, true, false, 0, 0 };

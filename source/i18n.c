@@ -78,7 +78,7 @@ static const char* STR[S_COUNT][NUM_LANGS] = {
     [S_ACC2] = { "CIAN", "CYAN", "シアン" },
     [S_ACC3] = { "MAGENTA", "MAGENTA", "マゼンタ" },
     [S_ACC4] = { "VERDE NEON", "NEON GREEN", "ネオングリーン" },
-    [S_ACC5] = { "NARANJA", "ORANGE", "オレンジ" },
+    [S_ACC5] = { "MORADO UV", "UV PURPLE", "UVパープル" },
     [S_ACC6] = { "ROJO", "RED", "レッド" },
 };
 

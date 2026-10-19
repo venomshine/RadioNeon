@@ -36,6 +36,7 @@ typedef struct Session {
     /* ring buffer */
     u8* ring;
     size_t rhead, rtail, rfill;
+    u64 written;          /* total bytes ever written (for the HUD hex ticker) */
     LightLock lock;
     CondVar cv;
     volatile bool netDone;
@@ -194,6 +195,7 @@ static void ring_write(Session* s, const u8* p, size_t n) {
         memcpy(s->ring, p + first, k - first);
         s->rhead = (s->rhead + k) % RING_SIZE;
         s->rfill += k;
+        s->written += k;
         CondVar_Broadcast(&s->cv);
         LightLock_Unlock(&s->lock);
         p += k; n -= k;
@@ -804,6 +806,20 @@ float player_get_spectrum(float* bands, int n) {
         level += v;
     }
     return level / n;
+}
+
+int player_peek_stream(unsigned char* out, int n) {
+    int k = 0;
+    LightLock_Lock(&g_lock);
+    Session* s = g_cur;
+    if (s) {
+        LightLock_Lock(&s->lock);
+        k = s->written < (u64)n ? (int)s->written : n;
+        for (int i = 0; i < k; i++) out[i] = s->ring[(s->rhead + RING_SIZE - k + i) % RING_SIZE];
+        LightLock_Unlock(&s->lock);
+    }
+    LightLock_Unlock(&g_lock);
+    return k;
 }
 
 void player_exit(void) {

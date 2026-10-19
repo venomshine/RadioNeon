@@ -146,28 +146,62 @@ float text_fit(const char* s, float maxSc, float maxW) {
     return maxSc * maxW / w;
 }
 
-float mono_width(const char* s, int sc) { return (float)strlen(s) * 6 * sc - sc; }
+/* next character: ASCII as is, Ñ -> 0x100, ñ -> 0x101, any other UTF-8 sequence -> '?' */
+static unsigned mono_next(const unsigned char** pp) {
+    const unsigned char* p = *pp;
+    if (*p < 0x80) { *pp = p + 1; return *p; }
+    if (p[0] == 0xC3 && (p[1] == 0x91 || p[1] == 0xB1)) { *pp = p + 2; return p[1] == 0x91 ? 0x100 : 0x101; }
+    *pp = p + 1;
+    while (**pp && (**pp & 0xC0) == 0x80) (*pp)++;
+    return '?';
+}
+
+bool mono_ok(const char* s) {
+    const unsigned char* p = (const unsigned char*)s;
+    while (*p) {
+        if (*p < 0x80) { p++; continue; }
+        if (p[0] == 0xC3 && (p[1] == 0x91 || p[1] == 0xB1)) { p += 2; continue; }
+        return false;
+    }
+    return true;
+}
+
+float mono_width(const char* s, int sc) {
+    int n = 0;
+    for (const unsigned char* p = (const unsigned char*)s; *p; n++) mono_next(&p);
+    return (float)n * 6 * sc - sc;
+}
+
+static void mono_rows(const unsigned char* g, int r0, int nrows, float x, float y, int sc, u32 col) {
+    for (int r = 0; r < nrows; r++) {
+        unsigned bits = g[r];
+        int b = 0;
+        while (b < 5) {
+            if (bits & (0x10 >> b)) {
+                int s0 = b;
+                while (b < 5 && (bits & (0x10 >> b))) b++;
+                C2D_DrawRectSolid(x + s0 * sc, y + (r0 + r) * sc, 0, (b - s0) * sc, sc, col);
+            } else b++;
+        }
+    }
+}
 
 float mono_draw(const char* s, float x, float y, int sc, u32 col, int align) {
+    static const unsigned char TILDE[2] = { 0x0D, 0x16 };   /* pixel ~ */
     float w = mono_width(s, sc);
     if (align == 1) x -= w / 2;
     else if (align == 2) x -= w;
     x = floorf(x); y = floorf(y);
-    for (const unsigned char* p = (const unsigned char*)s; *p; p++, x += 6 * sc) {
-        unsigned c = *p;
-        if (c < 32 || c > 126) c = '?';
-        const unsigned char* g = MONO5x8[c - 32];
-        for (int r = 0; r < 8; r++) {
-            unsigned bits = g[r];
-            int b = 0;
-            while (b < 5) {
-                if (bits & (0x10 >> b)) {
-                    int s0 = b;
-                    while (b < 5 && (bits & (0x10 >> b))) b++;
-                    C2D_DrawRectSolid(x + s0 * sc, y + r * sc, 0, (b - s0) * sc, sc, col);
-                } else b++;
-            }
+    for (const unsigned char* p = (const unsigned char*)s; *p; x += 6 * sc) {
+        unsigned c = mono_next(&p);
+        if (c == 0x100 || c == 0x101) {
+            /* N / n with a tilde above (capitals start on row 1, small letters lower) */
+            mono_rows(MONO5x8[(c == 0x100 ? 'N' : 'n') - 32], 0, 8, x, y, sc, col);
+            mono_rows(TILDE, c == 0x100 ? -2 : 0, 2, x, y, sc, col);
+            continue;
         }
+        if (c < 32 || c > 126) c = '?';
+        mono_rows(MONO5x8[c - 32], 0, 8, x, y, sc, col);
     }
     return w;
 }

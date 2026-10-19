@@ -44,3 +44,5 @@ void player_get_info(PlayerInfo* out);
 float player_get_spectrum(float* bands, int n);
 /* n mono samples (-1..1) of what is playing now; returns false if silent */
 bool player_get_wave(float* out, int n, float* bass);
+/* the last n bytes that arrived from the station (real stream data); returns how many */
+int player_peek_stream(unsigned char* out, int n);

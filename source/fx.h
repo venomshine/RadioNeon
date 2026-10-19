@@ -47,6 +47,8 @@ float text_fit(const char* s, float maxSc, float maxW);
 /* 5x8 pixel monospace (Spleen) for HUD codes; scale 1 or 2; returns width */
 float mono_draw(const char* s, float x, float y, int sc, u32 col, int align);
 float mono_width(const char* s, int sc);
+/* true if the HUD font can draw it: ASCII plus Ñ/ñ (so "ESPAÑOL" matches "ENGLISH") */
+bool mono_ok(const char* s);
 
 /* Magic UI Hyper Text style scramble with hex/katakana glyphs */
 void hyper_text(const char* src, float progress, char* out, size_t outsz, unsigned seed);
