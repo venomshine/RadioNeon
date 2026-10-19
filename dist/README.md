@@ -48,6 +48,7 @@ Con la opción activa, **auriculares conectados** y una emisora sonando, la cons
 las pantallas se apagan (retroiluminación off) y sigue el audio. Si quitas los auriculares con la tapa cerrada, la radio
 se para (nunca suena por los altavoces con la tapa cerrada). Sin auriculares, o con la opción desactivada, la consola duerme
 normal y al despertar la app vuelve a conectar la emisora.
+Si la emisora se corta con la tapa cerrada, la consola sigue despierta mientras reconecta; si falla del todo (por ejemplo, no es audio), entra en reposo para no gastar batería a oscuras.
 
 ## Firmware DSP (audio)
 La app **no incluye ni extrae** firmware de Nintendo. Orden:

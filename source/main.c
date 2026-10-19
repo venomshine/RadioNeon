@@ -22,6 +22,7 @@
 #include "dspfw.h"
 #include "config.h"
 #include "i18n.h"
+#include "netlog.h"
 
 #define TOP_W 400
 #define BOT_W 320
@@ -937,16 +938,29 @@ static bool power_update(const PlayerInfo* pi) {
     PTMU_GetShellState(&shell);
     bool closed = shell == 0;
     bool hs = osIsHeadsetConnected();
-    bool active = g_playing >= 0 && pi->state != PS_STOPPED && pi->state != PS_ERROR;
-    bool block = g_cfg.lidPlay && hs && active;
-    if (closed && g_lcdOff) block = g_cfg.lidPlay && hs;   /* keep blocked while dark, even during RELINK */
-    if (block != g_sleepBlocked) { aptSetSleepAllowed(!block); g_sleepBlocked = block; }
-    if (closed && block && !g_lcdOff) { GSPLCD_PowerOffAllBacklights(); g_lcdOff = true; }
-    if (g_lcdOff && closed && !hs) {
-        /* headphones pulled out with the lid closed: never blast the speakers */
+    if (closed && g_lcdOff && !hs && g_playing >= 0) {
+        /* headphones pulled out with the lid closed: never blast the speakers. Stop first, then let it sleep. */
+        netlog("lid: headphones unplugged with the lid closed -> stop and sleep");
         stop_station();
     }
-    if (g_lcdOff && !closed) { GSPLCD_PowerOnAllBacklights(); g_lcdOff = false; }
+    /* RELINK / BUFFER count as playing: the stream comes back by itself. A final error or STOP does not,
+       so a dead stream never keeps the console awake in the dark. */
+    bool active = g_playing >= 0 && pi->state != PS_STOPPED && pi->state != PS_ERROR;
+    bool block = g_cfg.lidPlay && hs && active;
+    if (g_lcdOff && (!closed || !block)) {
+        GSPLCD_PowerOnAllBacklights();
+        g_lcdOff = false;
+        if (closed) netlog("lid: closed but nothing to play any more (state %d) -> sleep", pi->state);
+    }
+    if (block != g_sleepBlocked) {
+        aptSetSleepAllowed(!block);   /* allowing it again with the lid closed sleeps right away (APT_SleepIfShellClosed) */
+        g_sleepBlocked = block;
+    }
+    if (closed && block && !g_lcdOff) {
+        GSPLCD_PowerOffAllBacklights();
+        g_lcdOff = true;
+        netlog("lid: closed with headphones -> screens off, still playing");
+    }
     return g_lcdOff;
 }
 
@@ -1040,7 +1054,11 @@ int main(int argc, char** argv) {
         g_t = (osGetTime() - t0) / 1000.0f;
         hidScanInput();
         player_get_info(&pi);
-        if (g_woke) { g_woke = false; if (g_playing >= 0) play_station(g_playing); }   /* reconnect after sleep */
+        if (g_woke) {   /* reconnect after sleep (the network retries until Wi-Fi is back) */
+            g_woke = false;
+            netlog("wake up%s", g_playing >= 0 ? ": reconnecting" : "");
+            if (g_playing >= 0) play_station(g_playing);
+        }
         if (power_update(&pi)) { gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
         handle_input(&pi);
         player_get_info(&pi);
