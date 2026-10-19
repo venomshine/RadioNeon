@@ -1,0 +1,5 @@
+The files in this directory (except ConfigHelix.h, helix_memory.c and utils/*.h, written for radio3ds)
+are the RealNetworks Helix fixed-point AAC decoder, Copyright (c) 1995-2005 RealNetworks, Inc.,
+distributed under the RealNetworks Public Source License (RPSL) v1.0 / RealNetworks Community
+Source License (RCSL): http://www.helixcommunity.org/content/rpsl  - see the license block in each file.
+Source obtained from https://github.com/pschatzmann/arduino-libhelix (src/libhelix-aac).

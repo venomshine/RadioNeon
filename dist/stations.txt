@@ -1,0 +1,23 @@
+# Radio Neon / ラジオネオン - lista de emisoras
+# Formato:  Nombre | URL   (una por línea, '#' = comentario)
+# Soporta MP3 y AAC/AAC+ (ADTS) por http:// o https://
+LISTEN.moe J-POP | https://listen.moe/fallback
+R/a/dio アニメ | https://relay0.r-a-d.io/main.mp3
+幻想郷ラジオ Gensokyo | https://stream.gensokyoradio.net/1/
+Stereo Anime | https://radio.stereoanime.com/listen/stereoanime/128
+Kawaii Anime Radio (AAC+) | http://158.69.227.214:8137/stream
+JPopsuki Radio | http://65.21.170.149:8000/stream
+City Pop One | http://65.21.61.215:8000/citypopone
+日本のシティポップ BOX | https://play.streamafrica.net/japancitypop
+Only Hits Japan | https://j.onlyhit.us/play
+湘南ビーチFM 78.9 | https://shonanbeachfm.out.airtime.pro/shonanbeachfm_a
+FM世田谷 83.4 | https://fmsetagaya834.out.airtime.pro/fmsetagaya834_a
+OTTAVA クラシック | https://ottava2.out.airtime.pro/ottava2_a
+RadiCro レディクロ | https://radicrojapan.out.airtime.pro/radicrojapan_a
+Radio Hayama 葉山 | https://server10.reliastream.com/proxy/radiohayama
+羊飼いラジオ Hitsujikai | https://streaming.radio.co/se4a8e6a93/listen
+アシヤ・ラヂヲ (AAC) | https://s3.radio.co/sc8d895604/listen
+SOUND UP STATION NFRS | https://stream2.rcast.net/70945
+Fred Film Radio 日本語 | https://s10.webradio-hosting.com/proxy/fredradiojp/stream
+Replay News 日本語ニュース | https://replaynewsja.ice.infomaniak.ch/replaynewsja-128.mp3
+Nonstop Casiopea | https://nonstopcasiopea.radioca.st/
