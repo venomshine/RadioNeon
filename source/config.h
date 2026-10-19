@@ -14,6 +14,7 @@ typedef struct {
     bool autoplay;     /* start playing the last station on boot */
     int  lang;         /* LANGSEL_*: 0 system, 1 es, 2 en, 3 ja */
     int  station;      /* last station */
+    bool shuffle;      /* NEXT jumps to a random station */
 } Config;
 
 extern Config g_cfg;

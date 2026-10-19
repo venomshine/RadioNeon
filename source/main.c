@@ -32,11 +32,14 @@
 
 static C3D_RenderTarget *g_top, *g_bot;
 static float g_t;
-static int   g_sel = 0, g_playing = -1;
+static int   g_sel = 0, g_playing = -1;   /* g_sel = current station (playing, or the last one played) */
 enum { M_CTRL = 0, M_LIST, M_MENU, M_OPT, M_ABOUT };
 static int   g_mode = M_CTRL;
 static int   g_view[MAX_STATIONS], g_viewN = 0, g_cur = 0;   /* list view (all or favourites) */
 static bool  g_favView = false;
+static int   g_listFrom = 0;                 /* screen the list was opened from (B / BACK returns there) */
+#define HIST_N 32
+static int   g_hist[HIST_N], g_histN = 0;     /* shuffle history, so PREV goes back */
 static int   g_menuCur = 0, g_optCur = 0;
 static bool  g_dialog = false;
 static float g_dialogT = -10;
@@ -134,14 +137,31 @@ static void play_station(int i) {
     i = (i % g_stationCount + g_stationCount) % g_stationCount;
     g_sel = i; g_playing = i;
     player_play(g_stations[i].url);
-}
-static void stop_station(void) { player_stop(); g_playing = -1; }
-static void select_rel(int d, bool play) {
-    if (!g_stationCount) return;
-    g_sel = ((g_sel + d) % g_stationCount + g_stationCount) % g_stationCount;
-    if (play) play_station(g_sel);
+}static void stop_station(void) { player_stop(); g_playing = -1; }
+static bool in_recent(int st, int depth) {
+    for (int k = g_histN - 1; k >= 0 && k >= g_histN - depth; k--) if (g_hist[k] == st) return true;
+    return false;
 }
 
+/* PREV / NEXT. Shuffle: NEXT picks a random station not heard recently, PREV walks back the history. */
+static void step_station(int dir) {
+    int n = g_stationCount;
+    if (!n) return;
+    if (g_cfg.shuffle && n > 2) {
+        if (dir < 0) {
+            if (g_histN > 0) { play_station(g_hist[--g_histN]); return; }
+        } else {
+            int depth = n / 2 < 8 ? n / 2 : 8, nxt = g_sel;
+            for (int t = 0; t < 24 && (nxt == g_sel || in_recent(nxt, depth)); t++) nxt = rand() % n;
+            if (nxt == g_sel) nxt = (g_sel + 1 + rand() % (n - 1)) % n;
+            if (g_histN == HIST_N) { memmove(g_hist, g_hist + 1, sizeof(int) * (HIST_N - 1)); g_histN--; }
+            g_hist[g_histN++] = g_sel;
+            play_station(nxt);
+            return;
+        }
+    }
+    play_station(g_sel + dir);
+}
 /* --------------------------------------------------------------- top screen */
 static void status_tag(const PlayerInfo* pi, float right, float y) {
     const char* lab; u32 fg, bg = 0; bool fill = false;
@@ -363,9 +383,10 @@ static Btn B_DOK = { 44, 128, 112, 36, 0 }, B_DNO = { 164, 128, 112, 36, 0 };
 #define MENU_Y 36
 #define MENU_H 46
 #define NMENU 4
-#define NOPT 6
-static const float OPT_Y[NOPT] = { 31, 74, 106, 138, 170, 202 };
-static const float OPT_H[NOPT] = { 43, 32, 32, 32, 32, 32 };
+#define NOPT 7
+enum { OPT_ACCENT, OPT_LANG, OPT_SHUFFLE, OPT_LID, OPT_AUTO, OPT_SCAN, OPT_GLITCH };
+static const float OPT_Y[NOPT] = { 31, 72, 100, 128, 156, 184, 212 };
+static const float OPT_H[NOPT] = { 41, 28, 28, 28, 28, 28, 28 };
 
 static bool hit(const Btn* b, int x, int y) { return x >= b->x && x < b->x + b->w && y >= b->y && y < b->y + b->h; }
 
@@ -455,7 +476,8 @@ static void render_controls(const PlayerInfo* pi) {
     mono_draw("PREV", B_PREV.x + B_PREV.w / 2, B_PREV.y + 62, 1, B_PREV.press > 0.35f ? COL_BLACK : COL_DIM, 1);
     hud_button(&B_NEXT, CUT_TR | CUT_BR, false);
     icon_skip(B_NEXT.x + B_NEXT.w / 2, B_NEXT.y + 34, 1, B_NEXT.press > 0.35f ? COL_BLACK : COL_ACC);
-    mono_draw("NEXT", B_NEXT.x + B_NEXT.w / 2, B_NEXT.y + 62, 1, B_NEXT.press > 0.35f ? COL_BLACK : COL_DIM, 1);
+    mono_draw(g_cfg.shuffle ? "RANDOM" : "NEXT", B_NEXT.x + B_NEXT.w / 2, B_NEXT.y + 62, 1,
+              B_NEXT.press > 0.35f ? COL_BLACK : (g_cfg.shuffle ? COL_ACC : COL_DIM), 1);
     hud_button(&B_PLAY, CUT_TL | CUT_BR, true);
     icon_playstop(B_PLAY.x + B_PLAY.w / 2, B_PLAY.y + 34, g_morph, COL_BLACK);
     const char* pl = pi->state == PS_PLAYING ? "STOP" : (pi->state == PS_STOPPED || pi->state == PS_ERROR) ? "PLAY" : "LINK...";
@@ -489,8 +511,9 @@ static void list_follow(void) {
 
 static void set_mode(int m) { g_mode = m; g_modeT = g_t; }
 
-static void open_list(bool fav) {
+static void open_list(bool fav, int from) {
     g_favView = fav;
+    g_listFrom = from;
     build_view();
     g_cur = 0;
     for (int k = 0; k < g_viewN; k++) if (g_view[k] == g_sel) g_cur = k;
@@ -500,6 +523,10 @@ static void open_list(bool fav) {
     set_mode(M_LIST);
 }
 
+/* list cursor onto the current station (after L/R or a reload) */
+static void list_sync_cursor(void) {
+    for (int k = 0; k < g_viewN; k++) if (g_view[k] == g_sel) { g_cur = k; list_follow(); return; }
+}
 static void render_list(const PlayerInfo* pi) {
     if (fabsf(g_listVel) > 0.1f) { g_listScroll += g_listVel; g_listVel *= 0.92f; }
     float mx = list_max_scroll();
@@ -594,31 +621,31 @@ static void render_options(void) {
     sub_header(T(S_HDR_OPT), "設定", "CONFIG.INI");
     dashed_vline(5, LIST_Y, SCR_H, 3, 3, COL_LINE);
     C2D_DrawRectSolid(4, g_selY + 7, 0, 3, OPT_H[g_optCur] - 14, COL_ACC);
-    static const StrId LABEL[NOPT] = { S_OPT_ACCENT, S_OPT_LANG, S_OPT_LID, S_OPT_SCAN, S_OPT_GLITCH, S_OPT_AUTO };
+    static const StrId LABEL[NOPT] = { S_OPT_ACCENT, S_OPT_LANG, S_OPT_SHUFFLE, S_OPT_LID, S_OPT_AUTO, S_OPT_SCAN, S_OPT_GLITCH };
     bool hs = osIsHeadsetConnected();
     for (int i = 0; i < NOPT; i++) {
         float y = OPT_Y[i], h = OPT_H[i];
         bool sel = i == g_optCur;
         ch_fill(12, y + 1, 296, h - 2, 6, CUT_TL | CUT_BR, sel ? COL_CARBON : COL_PANEL);
         ch_outline(12, y + 1, 296, h - 2, 6, CUT_TL | CUT_BR, sel ? COL_ACC : COL_LINE, 1);
-        text_draw(T(LABEL[i]), 22, y + (g_lang == LANG_JA ? 4 : 3), 0.46f, sel ? COL_TEXT : col_a(COL_TEXT, 0.75f), 0);
+        text_draw(T(LABEL[i]), 22, y + (g_lang == LANG_JA ? 3 : 2), 0.46f, sel ? COL_TEXT : col_a(COL_TEXT, 0.75f), 0);
         char sb[96] = "";
         u32 sc = col_a(COL_DIM, sel ? 1 : 0.7f);
-        if (i == 0) {
+        if (i == OPT_ACCENT) {
             for (int k = 0; k < NUM_ACCENTS; k++) {
                 const AccentPreset* a = &ACCENTS[k];
                 u32 c = C2D_Color32(a->r, a->g, a->b, 255);
-                float sx = 22 + k * 24, sy = y + 22;
+                float sx = 22 + k * 24, sy = y + 21;
                 ch_fill(sx, sy, 18, 14, 3, CUT_TL | CUT_BR, c);
                 if (k == g_cfg.accent) ch_outline(sx - 3, sy - 3, 24, 20, 4, CUT_TL | CUT_BR, COL_TEXT, 1);
             }
-            mono_draw("<", 196, y + 26, 1, COL_DIM, 0);
-            lbl(acc_name(g_cfg.accent), 250, y + 26, 1, COL_ACC, 1);
-            mono_draw(">", 300, y + 26, 1, COL_DIM, 2);
+            mono_draw("<", 196, y + 25, 1, COL_DIM, 0);
+            lbl(acc_name(g_cfg.accent), 250, y + 25, 1, COL_ACC, 1);
+            mono_draw(">", 300, y + 25, 1, COL_DIM, 2);
             continue;
         }
-        if (i == 1) {
-            lbl(T(S_OPTS_LANG), 22, y + 19, 1, sc, 0);
+        if (i == OPT_LANG) {
+            lbl(T(S_OPTS_LANG), 22, y + 17, 1, sc, 0);
             char v[48];
             if (g_cfg.lang == LANGSEL_SYSTEM) {
                 static const char* SYS[] = { "ES", "EN", "JA" };
@@ -629,14 +656,18 @@ static void render_options(void) {
             mono_draw(">", 304, y + 10, 1, COL_DIM, 2);
             continue;
         }
-        if (i == 2) snprintf(sb, sizeof(sb), T(S_OPTS_LID), T(hs ? S_HS_YES : S_HS_NO));
-        else snprintf(sb, sizeof(sb), "%s", T(i == 3 ? S_OPTS_SCAN : i == 4 ? S_OPTS_GLITCH : S_OPTS_AUTO));
-        lbl(sb, 22, y + 19, 1, sc, 0);
-        bool on = i == 2 ? g_cfg.lidPlay : i == 3 ? g_cfg.scanlines : i == 4 ? g_cfg.glitch : g_cfg.autoplay;
-        hud_switch(256, y + 7, on);
+        bool on = false;
+        switch (i) {
+            case OPT_SHUFFLE: snprintf(sb, sizeof(sb), "%s", T(S_OPTS_SHUFFLE)); on = g_cfg.shuffle; break;
+            case OPT_LID:     snprintf(sb, sizeof(sb), T(S_OPTS_LID), T(hs ? S_HS_YES : S_HS_NO)); on = g_cfg.lidPlay; break;
+            case OPT_AUTO:    snprintf(sb, sizeof(sb), "%s", T(S_OPTS_AUTO)); on = g_cfg.autoplay; break;
+            case OPT_SCAN:    snprintf(sb, sizeof(sb), "%s", T(S_OPTS_SCAN)); on = g_cfg.scanlines; break;
+            default:          snprintf(sb, sizeof(sb), "%s", T(S_OPTS_GLITCH)); on = g_cfg.glitch; break;
+        }
+        lbl(sb, 22, y + 17, 1, sc, 0);
+        hud_switch(256, y + 6, on);
     }
 }
-
 /* ---------------- about */
 static void render_about(void) {
     sub_header(T(S_HDR_ABOUT), "情報", "V1.0.0");
@@ -780,35 +811,35 @@ static void open_dialog(void) { g_dialog = true; g_dialogT = g_t; }
 
 static void toggle_fav(int i) {
     fav_toggle(i);
-    if (g_mode == M_LIST && g_favView) { build_view(); if (g_viewN) g_sel = g_view[g_cur]; }
+    if (g_mode == M_LIST && g_favView) build_view();   /* the cursor stays put; the current station does not change */
 }
-
 static void menu_select(int i) {
     switch (i) {
-        case 0: open_list(false); break;
-        case 1: open_list(true); break;
+        case 0: open_list(false, M_MENU); break;
+        case 1: open_list(true, M_MENU); break;
         case 2: g_optCur = 0; g_selY = OPT_Y[0]; g_selV = 0; set_mode(M_OPT); break;
         default: set_mode(M_ABOUT); break;
     }
 }
-
 static void opt_change(int i, int dir) {
     switch (i) {
-        case 0: g_cfg.accent = ((g_cfg.accent + dir) % NUM_ACCENTS + NUM_ACCENTS) % NUM_ACCENTS; config_apply_accent(); break;
-        case 1: g_cfg.lang = ((g_cfg.lang + dir) % NUM_LANGSEL + NUM_LANGSEL) % NUM_LANGSEL; i18n_resolve(g_cfg.lang); break;
-        case 2: g_cfg.lidPlay = !g_cfg.lidPlay; break;
-        case 3: g_cfg.scanlines = !g_cfg.scanlines; break;
-        case 4: g_cfg.glitch = !g_cfg.glitch; break;
-        case 5: g_cfg.autoplay = !g_cfg.autoplay; break;
+        case OPT_ACCENT:  g_cfg.accent = ((g_cfg.accent + dir) % NUM_ACCENTS + NUM_ACCENTS) % NUM_ACCENTS; config_apply_accent(); break;
+        case OPT_LANG:    g_cfg.lang = ((g_cfg.lang + dir) % NUM_LANGSEL + NUM_LANGSEL) % NUM_LANGSEL; i18n_resolve(g_cfg.lang); break;
+        case OPT_SHUFFLE: g_cfg.shuffle = !g_cfg.shuffle; g_histN = 0; break;
+        case OPT_LID:     g_cfg.lidPlay = !g_cfg.lidPlay; break;
+        case OPT_AUTO:    g_cfg.autoplay = !g_cfg.autoplay; break;
+        case OPT_SCAN:    g_cfg.scanlines = !g_cfg.scanlines; break;
+        case OPT_GLITCH:  g_cfg.glitch = !g_cfg.glitch; break;
     }
     config_save();
 }
+static void to_menu(void) { g_selY = g_menuCur * MENU_H; g_selV = 0; set_mode(M_MENU); }
 
 static void go_back(void) {
-    if (g_mode == M_LIST || g_mode == M_OPT || g_mode == M_ABOUT) { g_selY = g_menuCur * MENU_H; g_selV = 0; set_mode(M_MENU); }
+    if (g_mode == M_LIST) { if (g_listFrom == M_MENU) to_menu(); else set_mode(M_CTRL); }
+    else if (g_mode == M_OPT || g_mode == M_ABOUT) to_menu();
     else if (g_mode == M_MENU) set_mode(M_CTRL);
 }
-
 static void handle_input(const PlayerInfo* pi) {
     u32 kd = hidKeysDown(), kh = hidKeysHeld(), ku = hidKeysUp();
     static int repeat = 0;
@@ -827,10 +858,17 @@ static void handle_input(const PlayerInfo* pi) {
         }
         return;
     }
+    /* Buttons (each one does one thing, only where it makes sense):
+     *   everywhere : START exit dialog · L / R previous / next station (or random with shuffle)
+     *   CTRL       : A play/stop · Y favourite · X menu · LEFT/RIGHT previous / next
+     *   LIST       : UP/DOWN move · LEFT/RIGHT page · A play · Y favourite · B back · SELECT reload stations.txt
+     *   MENU       : UP/DOWN · A open · B or X close
+     *   OPTIONS    : UP/DOWN · LEFT/RIGHT or A change · B back
+     *   ABOUT      : B back */
     if (kd & KEY_START) { open_dialog(); return; }
-    if (kd & (KEY_ZL | KEY_L)) select_rel(-1, true);
-    if (kd & (KEY_ZR | KEY_R)) select_rel(1, true);
-    if (kd & KEY_SELECT) { stop_station(); stations_load(); fav_load(); if (g_sel >= g_stationCount) g_sel = 0; build_view(); g_changeT = g_t; }
+    if (kd & KEY_L) step_station(-1);
+    if (kd & KEY_R) step_station(1);
+    if (kd & (KEY_L | KEY_R)) list_sync_cursor();
 
     int vert = 0;
     if (kd & (KEY_DUP | KEY_CPAD_UP)) { vert = -1; repeat = 0; }
@@ -842,20 +880,27 @@ static void handle_input(const PlayerInfo* pi) {
 
     switch (g_mode) {
         case M_CTRL:
-            if (kd & KEY_A) play_station(g_sel);
-            if (kd & KEY_B) stop_station();
+            if (kd & KEY_A) { if (idle) play_station(g_sel); else stop_station(); }
             if (kd & KEY_Y) toggle_fav(g_sel);
             if (kd & KEY_X) { g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); }
-            if (vert) select_rel(vert, false);
-            if (horiz) select_rel(horiz, true);
+            if (horiz) step_station(horiz);
             break;
         case M_LIST:
-            if (kd & KEY_A) { if (g_viewN) play_station(g_view[g_cur]); }
-            if (kd & KEY_B) go_back();
-            if (kd & KEY_X) set_mode(M_CTRL);
+            if ((kd & KEY_A) && g_viewN) play_station(g_view[g_cur]);
             if ((kd & KEY_Y) && g_viewN) toggle_fav(g_view[g_cur]);
-            if (vert && g_viewN) { g_cur = (g_cur + vert + g_viewN) % g_viewN; g_sel = g_view[g_cur]; list_follow(); }
-            if (horiz) select_rel(horiz, true);
+            if (kd & KEY_B) go_back();
+            if (kd & KEY_SELECT) {
+                stop_station(); stations_load(); fav_load();
+                if (g_sel >= g_stationCount) g_sel = 0;
+                g_histN = 0; build_view(); list_sync_cursor(); g_changeT = g_t;
+            }
+            if (vert && g_viewN) { g_cur = (g_cur + vert + g_viewN) % g_viewN; list_follow(); }
+            if (horiz && g_viewN) {   /* page */
+                g_cur += horiz * 6;
+                if (g_cur < 0) g_cur = 0;
+                if (g_cur >= g_viewN) g_cur = g_viewN - 1;
+                list_follow();
+            }
             break;
         case M_MENU:
             if (kd & KEY_A) menu_select(g_menuCur);
@@ -865,13 +910,11 @@ static void handle_input(const PlayerInfo* pi) {
         case M_OPT:
             if (kd & KEY_A) opt_change(g_optCur, 1);
             if (kd & KEY_B) go_back();
-            if (kd & KEY_X) set_mode(M_CTRL);
             if (vert) g_optCur = (g_optCur + vert + NOPT) % NOPT;
             if (horiz) opt_change(g_optCur, horiz);
             break;
         default:
-            if (kd & (KEY_A | KEY_B)) go_back();
-            if (kd & KEY_X) set_mode(M_CTRL);
+            if (kd & KEY_B) go_back();
             break;
     }
 
@@ -880,10 +923,10 @@ static void handle_input(const PlayerInfo* pi) {
         if (g_mode != M_CTRL && hit(&B_BACK, x, y)) { press(&B_BACK, x, y); go_back(); }
         else if (g_mode == M_CTRL) {
             if (hit(&B_PLAY, x, y)) { press(&B_PLAY, x, y); if (idle || g_sel != g_playing) play_station(g_sel); else stop_station(); }
-            else if (hit(&B_PREV, x, y)) { press(&B_PREV, x, y); select_rel(-1, true); }
-            else if (hit(&B_NEXT, x, y)) { press(&B_NEXT, x, y); select_rel(1, true); }
+            else if (hit(&B_PREV, x, y)) { press(&B_PREV, x, y); step_station(-1); }
+            else if (hit(&B_NEXT, x, y)) { press(&B_NEXT, x, y); step_station(1); }
             else if (hit(&B_CSTAR, x, y)) { press(&B_CSTAR, x, y); toggle_fav(g_sel); }
-            else if (hit(&B_CARD, x, y)) { press(&B_CARD, x, y); open_list(false); }
+            else if (hit(&B_CARD, x, y)) { press(&B_CARD, x, y); open_list(false, M_CTRL); }
             else if (hit(&B_MENU, x, y)) { press(&B_MENU, x, y); g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); }
             else if (hit(&B_EXIT, x, y)) { press(&B_EXIT, x, y); open_dialog(); }
         } else if (g_mode == M_LIST) {
@@ -896,7 +939,7 @@ static void handle_input(const PlayerInfo* pi) {
                 if (y < OPT_Y[i] || y >= OPT_Y[i] + OPT_H[i]) continue;
                 add_lock(x, y);
                 g_optCur = i;
-                if (i == 0 && y >= OPT_Y[0] + 18 && x >= 20 && x < 20 + NUM_ACCENTS * 24) {
+                if (i == OPT_ACCENT && y >= OPT_Y[0] + 18 && x >= 20 && x < 20 + NUM_ACCENTS * 24) {
                     g_cfg.accent = (x - 20) / 24; config_apply_accent(); config_save();
                 } else opt_change(i, 1);
                 break;
@@ -913,7 +956,7 @@ static void handle_input(const PlayerInfo* pi) {
             int k = (int)((g_ty0 - LIST_Y + g_listScroll) / ROW_H);
             if (k >= 0 && k < g_viewN) {
                 add_lock(g_tx0, g_ty0);
-                g_cur = k; g_sel = g_view[k];
+                g_cur = k;
                 if (g_tx0 >= 278) toggle_fav(g_view[k]);   /* star column */
                 else play_station(g_view[k]);
             }

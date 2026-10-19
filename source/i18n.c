@@ -23,6 +23,8 @@ static const char* STR[S_COUNT][NUM_LANGS] = {
     [S_OPT_GLITCH] = { "Glitch RGB", "RGB glitch", "RGBグリッチ" },
     [S_OPT_AUTO]   = { "Arrancar con la última emisora", "Start with the last station", "前回の局で起動" },
     [S_OPT_LANG]   = { "Idioma", "Language", "言語" },
+    [S_OPT_SHUFFLE]= { "Aleatorio", "Shuffle", "シャッフル" },
+    [S_OPTS_SHUFFLE]={ "NEXT = UNA EMISORA AL AZAR", "NEXT = A RANDOM STATION", "NEXT = ランダムな局" },
     [S_OPTS_LID]   = { "SEGUIR SONANDO // AURIC: %s", "KEEP PLAYING // PHONES: %s", "再生を続ける // イヤホン: %s" },
     [S_HS_YES]     = { "CONECTADOS", "PLUGGED", "接続中" },
     [S_HS_NO]      = { "NO", "NO", "なし" },
