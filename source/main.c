@@ -24,6 +24,7 @@
 #include "i18n.h"
 #include "netlog.h"
 #include "app.h"
+#include "qrcodegen.h"
 
 #define TOP_W 400
 #define BOT_W 320
@@ -706,35 +707,89 @@ static void render_options(void) {
     }
 }
 /* ---------------- about */
+/* QR codes for the about screen: version 4 (33 modules) for all three, so they have the same size and
+   2 px per module exactly (no blurry half pixels). Encoded once. */
+#define QR_VER 4
+static uint8_t g_qr[3][qrcodegen_BUFFER_LEN_FOR_VERSION(QR_VER)];
+static bool g_qrOk[3];
+
+static void qr_init(void) {
+    static const char* URLS[3] = { URL_GITHUB, URL_DISCORD, URL_KOFI };
+    uint8_t tmp[qrcodegen_BUFFER_LEN_FOR_VERSION(QR_VER)];
+    for (int i = 0; i < 3; i++)
+        g_qrOk[i] = qrcodegen_encodeText(URLS[i], tmp, g_qr[i], qrcodegen_Ecc_LOW, QR_VER, QR_VER, qrcodegen_Mask_AUTO, true);
+}
+
+/* white quiet frame of 4 px outside (x, y), dark modules merged in horizontal runs */
+static void draw_qr(const uint8_t* qr, float x, float y, int px) {
+    int n = qrcodegen_getSize(qr);
+    C2D_DrawRectSolid(x - 4, y - 4, 0, n * px + 8, n * px + 8, C2D_Color32(255, 255, 255, 255));
+    for (int r = 0; r < n; r++) {
+        for (int c = 0; c < n;) {
+            if (!qrcodegen_getModule(qr, c, r)) { c++; continue; }
+            int c0 = c;
+            while (c < n && qrcodegen_getModule(qr, c, r)) c++;
+            C2D_DrawRectSolid(x + c0 * px, y + r * px, 0, (c - c0) * px, px, C2D_Color32(0, 0, 0, 255));
+        }
+    }
+}
+
 static void render_about(void) {
-    sub_header(T(S_HDR_ABOUT), "情報", "V1.0.0");
-    ch_fill(10, 34, 300, 64, 8, CUT_TL | CUT_BR, COL_PANEL);
-    ch_outline(10, 34, 300, 64, 8, CUT_TL | CUT_BR, COL_LINE, 1);
-    edge_trace(10, 34, 300, 64, 8, CUT_TL | CUT_BR, g_t / 6.0f, 40, COL_ACC);
-    text_draw("Radio Neon ラジオネオン", 20, 38, 0.62f, COL_TEXT, 0);
-    mono_draw("VERSION 1.0.0 // 3DSX + CIA // 2026", 20, 62, 1, COL_DIM, 0);
-    text_draw(T(S_CREATED), 20, 74, 0.55f, COL_ACC, 0);
-    lbl(T(S_CREDITS), 12, 104, 1, COL_ACC, 0);
-    C2D_DrawRectSolid(12, 113, 0, 296, 1, COL_LINE);
+    sub_header(T(S_HDR_ABOUT), "情報", "V" APP_VERSION);
+    /* title card */
+    ch_fill(10, 34, 300, 42, 8, CUT_TL | CUT_BR, COL_PANEL);
+    ch_outline(10, 34, 300, 42, 8, CUT_TL | CUT_BR, COL_LINE, 1);
+    edge_trace(10, 34, 300, 42, 8, CUT_TL | CUT_BR, g_t / 6.0f, 40, COL_ACC);
+    text_draw("Radio Neon ラジオネオン", 20, 36, 0.6f, COL_TEXT, 0);
+    text_draw(T(S_CREATED), 20, 56, 0.5f, COL_ACC, 0);
+    mono_draw("MPL-2.0 // 2026", 300, 61, 1, COL_DIM, 2);
+
+    /* GitHub / Discord / Ko-fi */
+    static const char* QL[3] = { "GITHUB", "DISCORD", "KO-FI" };
+    const int PX = 2, QS = 33 * PX;
+    for (int i = 0; i < 3; i++) {
+        float qx = 34 + i * 93, qy = 86;   /* brackets span 27..293: centred on the screen */
+        if (g_qrOk[i]) draw_qr(g_qr[i], qx, qy, PX);
+        brackets(qx - 7, qy - 7, QS + 14, QS + 14, 5, col_a(COL_ACC, 0.5f), 1);
+        mono_draw(QL[i], qx + QS / 2, qy + QS + 8, 1, COL_ACC, 1);
+    }
+
+    /* end credits rolling up in a small window at the bottom, fading in and out at the edges */
     static const char* L[][2] = {
-        { "OPENDSP (C) 2026 CELLENSERES", "BSD-2-CLAUSE" },
-        { "LIBCTRU / CITRO2D / CITRO3D", "ZLIB" },
+        { "RADIO NEON // VENOMSHINE", "MPL-2.0" },
+        { "OPENDSP (C) 2026 CELLENSERES", "BSD-2" },
+        { "HELIX AAC/HE-AAC DECODER", "RPSL/RCSL" },
+        { "LIBMPG123 (MP3)", "LGPL-2.1" },
         { "LIBCURL", "CURL" },
         { "MBEDTLS", "APACHE-2.0" },
-        { "LIBMPG123 (MP3)", "LGPL-2.1" },
-        { "HELIX AAC/HE-AAC DECODER", "RPSL/RCSL" },
+        { "MOZILLA CA CERTIFICATES", "MPL-2.0" },
+        { "LIBCTRU / CITRO2D / CITRO3D", "ZLIB" },
         { "LIBICONV / ZLIB", "LGPL / ZLIB" },
-        { "SPLEEN 5X8 FONT", "BSD-2-CLAUSE" },
+        { "QR CODE GENERATOR (NAYUKI)", "MIT" },
+        { "SPLEEN 5X8 FONT", "BSD-2" },
         { "DEVKITPRO / DEVKITARM", "TOOLCHAIN" },
     };
-    for (int i = 0; i < 9; i++) {
-        float y = 118 + i * 12;
+    const int NL = sizeof(L) / sizeof(L[0]), LH = 12;
+    const float wy = 176, wh = 60;
+    C2D_DrawRectSolid(12, wy - 3, 0, 296, 1, COL_LINE);
+    C2D_DrawRectSolid(12, wy - 3, 0, 30, 1, COL_ACC);
+    int total = (NL + 3) * LH + (int)wh;   /* credits + gap + the Nintendo note, then it starts again */
+    float off = fmodf(g_t * 14, (float)total);
+    scissor_begin(false, 10, wy, 300, wh);
+    float y0 = wy + wh - off;
+    lbl(T(S_CREDITS), 160, y0, 1, COL_ACC, 1);
+    for (int i = 0; i < NL; i++) {
+        float y = y0 + (i + 2) * LH;
+        if (y < wy - LH || y > wy + wh) continue;
         mono_draw(L[i][0], 14, y, 1, i == 0 ? COL_TEXT : col_a(COL_TEXT, 0.8f), 0);
         mono_draw(L[i][1], 306, y, 1, i == 0 ? COL_ACC : COL_DIM, 2);
     }
-    lbl(T(S_NO_NINTENDO), 160, 228, 1, col_a(COL_DIM, 0.6f), 1);
+    lbl(T(S_NO_NINTENDO), 160, y0 + (NL + 3) * LH, 1, col_a(COL_DIM, 0.8f), 1);
+    scissor_end();
+    u32 bg = COL_BG, clear = col_a(COL_BG, 0);
+    C2D_DrawRectangle(10, wy, 0, 300, 14, bg, bg, clear, clear);
+    C2D_DrawRectangle(10, wy + wh - 14, 0, 300, 14, clear, clear, bg, bg);
 }
-
 /* ---------------- exit confirmation dialog */
 static void render_dialog(void) {
     float k = ease_out_cubic((g_t - g_dialogT) / 0.22f);
@@ -1156,6 +1211,7 @@ int main(int argc, char** argv) {
     g_top = C2D_CreateScreenTarget(GFX_TOP, GFX_LEFT);
     g_bot = C2D_CreateScreenTarget(GFX_BOTTOM, GFX_LEFT);
     fx_text_init();
+    qr_init();
     srand((unsigned)osGetTime());
     aptHook(&g_aptCookie, apt_cb, NULL);
 

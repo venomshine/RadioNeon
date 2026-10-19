@@ -33,7 +33,7 @@ static const char* STR[S_COUNT][NUM_LANGS] = {
     [S_OPTS_AUTO]  = { "REPRODUCE AL INICIAR LA APP", "PLAYS WHEN THE APP STARTS", "起動時に自動再生" },
     [S_OPTS_LANG]  = { "SISTEMA = IDIOMA DE LA CONSOLA", "SYSTEM = CONSOLE LANGUAGE", "システム = 本体の言語" },
     [S_LANG_SYSTEM]= { "SISTEMA", "SYSTEM", "システム" },
-    [S_CREATED]    = { "Creada por VENOMSHiNE", "Created by VENOMSHiNE", "制作: VENOMSHiNE" },
+    [S_CREATED]    = { "hecho por VENOMSHiNE", "made by VENOMSHiNE", "制作: VENOMSHiNE" },
     [S_CREDITS]    = { "CREDITOS // LICENCIAS", "CREDITS // LICENSES", "クレジット // ライセンス" },
     [S_NO_NINTENDO]= { "SIN FIRMWARE DE NINTENDO INCLUIDO", "NO NINTENDO FIRMWARE INCLUDED", "任天堂のファームウェアは含まれていません" },
     [S_DLG_TITLE]  = { "SALIR?", "EXIT?", "終了しますか？" },
