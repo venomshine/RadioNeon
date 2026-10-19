@@ -11,6 +11,12 @@ typedef enum {
     PS_ERROR
 } PlayerState;
 
+/* why the network is not delivering (shown while RELINK); NE_NOTAUDIO is final (PS_ERROR) */
+typedef enum {
+    NE_NONE = 0, NE_SOC, NE_NOWIFI, NE_NOIP, NE_DNS, NE_CONNECT, NE_TIMEOUT,
+    NE_TLS, NE_CERT, NE_HTTP, NE_CUT, NE_NOTAUDIO, NE_OTHER
+} NetErr;
+
 typedef struct {
     PlayerState state;
     char codec[16];      /* "MP3", "AAC", "AAC+" ... */
@@ -21,6 +27,9 @@ typedef struct {
     char title[256];     /* ICY StreamTitle (UTF-8) */
     char icyName[128];
     char error[96];
+    int  netErr;         /* NetErr */
+    int  netArg;         /* HTTP code, curl code or socInit result */
+    unsigned long long retryAt;   /* osGetTime() of the next attempt, 0 = trying now */
 } PlayerInfo;
 
 bool player_init(void);        /* network + decoders; audio is brought up by dspfw */

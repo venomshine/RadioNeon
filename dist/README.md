@@ -65,5 +65,6 @@ La app **no incluye ni extrae** firmware de Nintendo. Orden:
 
 ## Notas
 - El HTTPS verifica los certificados (raíces de Mozilla incluidas en la app). Si la fecha de la consola está mal, las emisoras https pueden fallar.
-- Si una emisora cae, la app reintenta sola.
+- Si una emisora cae o no hay red, la app reintenta sola sin rendirse (cada 2-15 s, o 30 s si el servidor da un error HTTP 4xx o un certificado no válido). Mientras tanto, la pantalla de arriba dice el motivo real (sin Wi-Fi, DNS, el servidor no responde, HTTP 404...) y cuánto falta para el siguiente intento.
+- Si la URL no es audio (una web o una lista .m3u/.pls), se avisa en vez de intentar reproducirla.
 - Créditos: OpenDSP © 2026 Cellenseres (BSD-2-Clause), libctru/citro2d/citro3d (zlib), libcurl, mbedTLS (Apache-2.0), libmpg123 (LGPL-2.1), Helix AAC (RealNetworks RPSL/RCSL), libiconv (LGPL), zlib, fuente Spleen © Frederic Cambus (BSD-2). Licencias en `third_party/` del zip y en `romfs/dsp/`.

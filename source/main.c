@@ -204,14 +204,27 @@ static void tr_error(const char* e, char* out, size_t n) {
     snprintf(out, n, "%s", e);
 }
 
+/* network problem in the user's language, with the retry countdown */
+static void net_message(const PlayerInfo* pi, char* out, size_t n) {
+    char msg[160];
+    snprintf(msg, sizeof(msg), T((StrId)(S_NE_SOC + pi->netErr - NE_SOC)), pi->netArg);
+    if (pi->state == PS_ERROR) { snprintf(out, n, "%s", msg); return; }
+    if (pi->netErr == NE_SOC || pi->netErr == NE_NOWIFI || pi->netErr == NE_NOIP) { snprintf(out, n, T(S_NET_WAITING), msg); return; }
+    u64 now = osGetTime();
+    if (pi->retryAt > now) snprintf(out, n, T(S_NET_RETRY_IN), msg, (int)((pi->retryAt - now + 999) / 1000));
+    else snprintf(out, n, T(S_NET_RETRYING), msg);
+}
+
 static void draw_icy(const PlayerInfo* pi) {
     char line[300]; u32 lc = COL_TEXT;
-    if (pi->state == PS_ERROR) { tr_error(pi->error, line, sizeof(line)); lc = COL_RED; }
+    bool net = pi->netErr != NE_NONE && pi->state != PS_PLAYING && pi->state != PS_STOPPED;
+    if (net) { net_message(pi, line, sizeof(line)); lc = COL_RED; }
+    else if (pi->state == PS_ERROR) { tr_error(pi->error, line, sizeof(line)); lc = COL_RED; }
     else if (pi->title[0]) snprintf(line, sizeof(line), "%s", pi->title);
     else if (pi->state == PS_STOPPED) { snprintf(line, sizeof(line), "%s", T(S_IDLE)); lc = COL_DIM; }
     else if (pi->icyName[0]) snprintf(line, sizeof(line), "%s", pi->icyName);
     else { snprintf(line, sizeof(line), "%s", T(S_NO_ICY)); lc = COL_DIM; }
-    mono_draw(pi->state == PS_ERROR ? "ERR>" : "NOW>", 30, 106, 1, pi->state == PS_ERROR ? COL_RED : COL_ACC, 0);
+    mono_draw(pi->state == PS_ERROR ? "ERR>" : net ? "NET>" : "NOW>", 30, 106, 1, pi->state == PS_ERROR || net ? COL_RED : COL_ACC, 0);
     float x0 = 60, x1 = 370, tw = text_width(line, 0.5f);
     scissor_begin(true, x0, 100, x1 - x0, 18);
     if (tw <= x1 - x0) text_draw(line, x0, 101, 0.5f, lc, 0);

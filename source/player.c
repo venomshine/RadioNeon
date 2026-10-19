@@ -56,6 +56,7 @@ typedef struct Session {
 
     /* diagnostics */
     CURL* curl;
+    bool  notAudio;       /* server sent a web page / playlist instead of audio */
     bool  gotData;        /* first audio bytes of the current connection seen */
     u64   bytes;          /* audio bytes of the current connection */
 } Session;
@@ -66,6 +67,10 @@ static PlayerInfo g_info;
 static float     g_volume = 1.0f;
 static bool      g_ndspOk = false;
 static u32*      g_socBuf = NULL;
+static bool      g_socOk = false;   /* socInit succeeded (retried by net_ready if not) */
+static bool      g_acOk = false;
+static LightLock g_socLock;
+#define SOC_SIZE 0x100000
 static s32       g_mainPrio = 0x30;
 
 /* ------------------------------------------------------------------ utils */
@@ -84,6 +89,33 @@ static void sess_release(Session* s) {
 static void set_state(Session* s, PlayerState st) {
     LightLock_Lock(&g_lock);
     if (s == g_cur) g_info.state = st;
+    LightLock_Unlock(&g_lock);
+}
+
+/* dec thread state change: while the network is failing, "buffering" is shown as RELINK + the reason */
+static void set_state_dec(Session* s, PlayerState st) {
+    LightLock_Lock(&g_lock);
+    if (s == g_cur) g_info.state = (g_info.netErr && st != PS_PLAYING) ? PS_RECONNECTING : st;
+    LightLock_Unlock(&g_lock);
+}
+
+/* network problem shown to the user; retryAt = osGetTime() of the next attempt (0 = trying now).
+   If buffered audio is still playing we keep ON AIR until it runs out. */
+static void set_neterr(Session* s, int err, int arg, u64 retryAt) {
+    LightLock_Lock(&g_lock);
+    if (s == g_cur) {
+        g_info.netErr = err; g_info.netArg = arg; g_info.retryAt = retryAt;
+        if (g_info.state != PS_PLAYING && g_info.state != PS_ERROR && g_info.state != PS_STOPPED) g_info.state = PS_RECONNECTING;
+    }
+    LightLock_Unlock(&g_lock);
+}
+
+static void net_ok(Session* s) {
+    LightLock_Lock(&g_lock);
+    if (s == g_cur) {
+        g_info.netErr = NE_NONE; g_info.netArg = 0; g_info.retryAt = 0;
+        if (g_info.state == PS_RECONNECTING) g_info.state = PS_BUFFERING;
+    }
     LightLock_Unlock(&g_lock);
 }
 
@@ -245,7 +277,15 @@ static size_t write_cb(char* p, size_t sz, size_t nm, void* ud) {
     Session* s = ud;
     size_t n = sz * nm, total = n;
     if (s->stop) return 0;
-    if (!s->gotData) { s->gotData = true; log_connected(s); }
+    if (!s->gotData) {
+        s->gotData = true;
+        log_connected(s);
+        if (!strncmp(s->ctype, "text/", 5) || strstr(s->ctype, "mpegurl") || strstr(s->ctype, "scpls") || strstr(s->ctype, "xspf")) {
+            s->notAudio = true;
+            return 0;
+        }
+        net_ok(s);
+    }
     s->bytes += n;
     if (s->metaint <= 0) { ring_write(s, (u8*)p, n); return s->stop ? 0 : total; }
     while (n) {
@@ -280,14 +320,63 @@ static int xfer_cb(void* ud, curl_off_t a, curl_off_t b, curl_off_t c, curl_off_
     return ((Session*)ud)->stop ? 1 : 0;
 }
 
+/* is the console ready to connect? NE_NONE or the reason. Re-tries socInit if it failed at boot
+   (soc:U can still be held by the previous app): that used to leave the app without network forever. */
+static int net_ready(int* arg) {
+    LightLock_Lock(&g_socLock);
+    if (!g_socOk && g_socBuf) {
+        Result r = socInit(g_socBuf, SOC_SIZE);
+        g_socOk = R_SUCCEEDED(r);
+        if (!g_socOk) *arg = (int)r;
+        else netlog("socInit (retry): OK");
+    }
+    bool ok = g_socOk;
+    LightLock_Unlock(&g_socLock);
+    if (!ok) return NE_SOC;
+    if (gethostid() != 0) return NE_NONE;
+    u32 st = 0;   /* no IP: tell "no Wi-Fi" from "Wi-Fi up, waiting for DHCP" (ACU: 3 = connected) */
+    if (g_acOk && R_SUCCEEDED(ACU_GetStatus(&st)) && st == 3) return NE_NOIP;
+    return NE_NOWIFI;
+}
+
+static int classify(CURLcode rc, long code, double tcp, int* arg) {
+    switch (rc) {
+        case CURLE_HTTP_RETURNED_ERROR: *arg = (int)code; return NE_HTTP;
+        case CURLE_COULDNT_RESOLVE_HOST: return NE_DNS;
+        case CURLE_COULDNT_CONNECT: return NE_CONNECT;
+        case CURLE_OPERATION_TIMEDOUT: return tcp > 0 ? NE_CUT : NE_TIMEOUT;
+        case CURLE_PEER_FAILED_VERIFICATION: return NE_CERT;
+        case CURLE_SSL_CONNECT_ERROR: return NE_TLS;
+        case CURLE_OK: case CURLE_RECV_ERROR: case CURLE_SEND_ERROR:
+        case CURLE_GOT_NOTHING: case CURLE_PARTIAL_FILE: return NE_CUT;
+        default: *arg = (int)rc; return NE_OTHER;
+    }
+}
+
+static void wait_ms(Session* s, int ms) {
+    for (int t = 0; t < ms && !s->stop; t += 100) svcSleepThread(100 * 1000000ULL);
+}
+
+/* Never gives up on its own: network errors are retried with a growing pause (2 s .. 15 s; 30 s for
+   errors that rarely fix themselves, like HTTP 4xx or a bad certificate) and the real reason is shown.
+   Only "this is not audio" is final. */
 static void net_thread(void* arg) {
+    static const int BACKOFF[] = { 2, 3, 5, 8, 10, 15 };
     Session* s = arg;
-    int attempts = 0;
+    int attempts = 0, lastNotReady = -1;
     while (!s->stop) {
+        int narg = 0, nr = net_ready(&narg);
+        if (nr != NE_NONE) {
+            if (nr != lastNotReady) { netlog("not ready: %d (%08X), waiting", nr, (unsigned)narg); lastNotReady = nr; }
+            set_neterr(s, nr, narg, 0);   /* polled every second: the UI says "waiting", no countdown */
+            wait_ms(s, nr == NE_SOC ? 3000 : 1000);
+            continue;
+        }
+        if (lastNotReady >= 0) { netlog("network ready"); lastNotReady = -1; }
         CURL* c = curl_easy_init();
         if (!c) { set_error(s, "curl init failed"); break; }
         char errbuf[CURL_ERROR_SIZE] = "";
-        s->curl = c; s->gotData = false; s->bytes = 0;
+        s->curl = c; s->gotData = false; s->notAudio = false; s->bytes = 0;
         netlog("connect #%d: %s (wifi=%lu ip=%s)", attempts + 1, s->url, (unsigned long)osGetWifiStrength(), gethostid() ? "yes" : "no");
         curl_easy_setopt(c, CURLOPT_ERRORBUFFER, errbuf);
         struct curl_slist* h = curl_slist_append(NULL, "Icy-MetaData: 1");
@@ -306,6 +395,7 @@ static void net_thread(void* arg) {
         curl_easy_setopt(c, CURLOPT_NOSIGNAL, 1L);
         curl_easy_setopt(c, CURLOPT_BUFFERSIZE, 32768L);
         curl_easy_setopt(c, CURLOPT_HTTP_VERSION, CURL_HTTP_VERSION_1_1);
+        curl_easy_setopt(c, CURLOPT_FAILONERROR, 1L);   /* 4xx/5xx: no error page in the audio ring */
         curl_easy_setopt(c, CURLOPT_HEADERFUNCTION, hdr_cb);
         curl_easy_setopt(c, CURLOPT_HEADERDATA, s);
         curl_easy_setopt(c, CURLOPT_WRITEFUNCTION, write_cb);
@@ -327,16 +417,22 @@ static void net_thread(void* arg) {
         curl_slist_free_all(h);
         curl_easy_cleanup(c);
         if (s->stop) break;
-        if (code >= 400) {
-            char m[96]; snprintf(m, sizeof(m), "HTTP %ld", code);
-            set_error(s, m); break;
+        if (s->notAudio) {
+            netlog("not audio: content-type %s", s->ctype);
+            LightLock_Lock(&g_lock);
+            if (s == g_cur) { g_info.netErr = NE_NOTAUDIO; g_info.state = PS_ERROR; snprintf(g_info.error, sizeof(g_info.error), "%s", s->ctype); }
+            LightLock_Unlock(&g_lock);
+            break;
         }
-        if (++attempts > 6) {
-            char m[96]; snprintf(m, sizeof(m), "Red: %s", curl_easy_strerror(rc));
-            set_error(s, m); break;
-        }
-        set_state(s, PS_RECONNECTING);
-        for (int i = 0; i < 20 && !s->stop; i++) svcSleepThread(100 * 1000000ULL);
+        if (s->bytes >= 64 * 1024) attempts = 0;   /* it was playing fine: start the back-off again */
+        int earg = 0, err = classify(rc, code, tcp, &earg);
+        int wait = BACKOFF[attempts < 6 ? attempts : 5];
+        if ((err == NE_HTTP && code < 500) || err == NE_CERT) wait = 30;
+        attempts++;
+        netlog("retry in %d s (reason %d, arg %d)", wait, err, earg);
+        set_neterr(s, err, earg, osGetTime() + wait * 1000ULL);
+        wait_ms(s, wait * 1000);
+        if (!s->stop) set_neterr(s, err, earg, 0);   /* "retrying..." */
     }
     LightLock_Lock(&s->lock);
     s->netDone = true;
@@ -420,7 +516,7 @@ static void set_codec_name(Session* s, const char* n) {
 static bool rebuffer_if_needed(Session* s) {
     if (ring_fill(s) > 0) return true;
     if (s->netDone) return false;
-    set_state(s, PS_BUFFERING);
+    set_state_dec(s, PS_BUFFERING);
     if (!ring_wait(s, REBUF_BYTES)) return false;
     set_state(s, PS_PLAYING);
     return true;
@@ -487,9 +583,9 @@ static void decode_aac(Session* s) {
         if (err == ERR_AAC_INDATA_UNDERFLOW) {
             ptr = before; left = beforeLeft;
             if (s->netDone && ring_fill(s) == 0) break;
-            /* force refill */
+            /* force refill (if the ring ran dry the stream dropped: show BUFFER/RELINK, not ON AIR) */
             memmove(in, ptr, left); ptr = in;
-            if (!ring_wait(s, 1)) break;
+            if (!rebuffer_if_needed(s)) break;
             left += ring_read(s, in + left, INSZ - left);
             continue;
         }
@@ -515,10 +611,10 @@ static void decode_aac(Session* s) {
 
 static void dec_thread(void* arg) {
     Session* s = arg;
-    set_state(s, PS_CONNECTING);
+    set_state_dec(s, PS_CONNECTING);
     /* wait for the first data */
     if (ring_wait(s, 1)) {
-        set_state(s, PS_BUFFERING);
+        set_state_dec(s, PS_BUFFERING);
         if (ring_wait(s, PREBUF_BYTES)) {
             u8 peek[64]; size_t n;
             LightLock_Lock(&s->lock);
@@ -549,9 +645,15 @@ bool player_init(void) {
     LightLock_Init(&g_lock);
     memset(&g_info, 0, sizeof(g_info));
     svcGetThreadPriority(&g_mainPrio, CUR_THREAD_HANDLE);
+    LightLock_Init(&g_socLock);
     netlog_init();
-    g_socBuf = memalign(0x1000, 0x100000);
-    if (g_socBuf) { Result r = socInit(g_socBuf, 0x100000); netlog("socInit: %08lX", (unsigned long)r); }
+    g_acOk = R_SUCCEEDED(acInit());
+    g_socBuf = memalign(0x1000, SOC_SIZE);
+    if (g_socBuf) {
+        Result r = socInit(g_socBuf, SOC_SIZE);
+        g_socOk = R_SUCCEEDED(r);
+        netlog("socInit: %08lX%s", (unsigned long)r, g_socOk ? "" : " (will retry)");
+    }
     curl_global_init(CURL_GLOBAL_DEFAULT);
     mpg123_init();
     return true;
@@ -706,7 +808,8 @@ void player_exit(void) {
     svcSleepThread(200 * 1000000ULL);
     if (g_ndspOk) ndspExit();
     curl_global_cleanup();
-    socExit();
+    if (g_socOk) socExit();
+    if (g_acOk) acExit();
 }
 
 /* Smoothed scope data: n points, each the average of 12 frames (box low-pass ~3.7 kHz), taken from
