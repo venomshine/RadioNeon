@@ -119,6 +119,7 @@ static float lbl(const char* s, float x, float y, int sc, u32 col, int align) {
     if (mono_ok(s)) return mono_draw(s, x, y, sc, col, align);
     return text_draw(s, x, y - (sc == 2 ? 4 : 3), sc == 2 ? 0.6f : 0.42f, col, align);
 }
+
 static float lbl_width(const char* s, int sc) { return mono_ok(s) ? mono_width(s, sc) : text_width(s, sc == 2 ? 0.6f : 0.42f); }
 static const char* acc_name(int k) { return T((StrId)(S_ACC0 + k)); }
 
@@ -134,7 +135,10 @@ static void play_station(int i) {
     i = (i % g_stationCount + g_stationCount) % g_stationCount;
     g_sel = i; g_playing = i;
     player_play(g_stations[i].url);
-}static void stop_station(void) { player_stop(); g_playing = -1; }
+}
+
+static void stop_station(void) { player_stop(); g_playing = -1; }
+
 static bool in_recent(int st, int depth) {
     for (int k = g_histN - 1; k >= 0 && k >= g_histN - depth; k--) if (g_hist[k] == st) return true;
     return false;
@@ -159,6 +163,7 @@ static void step_station(int dir) {
     }
     play_station(g_sel + dir);
 }
+
 /* --------------------------------------------------------------- top screen */
 static void status_tag(const PlayerInfo* pi, float right, float y) {
     const char* lab; u32 fg, bg = 0; bool fill = false;
@@ -565,6 +570,7 @@ static void open_list(bool fav, int from) {
 static void list_sync_cursor(void) {
     for (int k = 0; k < g_viewN; k++) if (g_view[k] == g_sel) { g_cur = k; list_follow(); return; }
 }
+
 static void render_list(const PlayerInfo* pi) {
     if (fabsf(g_listVel) > 0.1f) { g_listScroll += g_listVel; g_listVel *= 0.92f; }
     float mx = list_max_scroll();
@@ -706,6 +712,7 @@ static void render_options(void) {
         hud_switch(256, y + 6, on);
     }
 }
+
 /* ---------------- about */
 /* QR codes for the about screen: version 4 (33 modules) for all three, so they have the same size and
    2 px per module exactly (no blurry half pixels). Encoded once. */
@@ -790,6 +797,7 @@ static void render_about(void) {
     C2D_DrawRectangle(10, wy, 0, 300, 14, bg, bg, clear, clear);
     C2D_DrawRectangle(10, wy + wh - 14, 0, 300, 14, clear, clear, bg, bg);
 }
+
 /* ---------------- exit confirmation dialog */
 static void render_dialog(void) {
     float k = ease_out_cubic((g_t - g_dialogT) / 0.22f);
@@ -905,6 +913,7 @@ static void toggle_fav(int i) {
     fav_toggle(i);
     if (g_mode == M_LIST && g_favView) build_view();   /* the cursor stays put; the current station does not change */
 }
+
 static void menu_select(int i) {
     switch (i) {
         case 0: open_list(false, M_MENU); break;
@@ -913,6 +922,7 @@ static void menu_select(int i) {
         default: set_mode(M_ABOUT); break;
     }
 }
+
 static void opt_change(int i, int dir) {
     switch (i) {
         case OPT_ACCENT:  g_cfg.accent = ((g_cfg.accent + dir) % NUM_ACCENTS + NUM_ACCENTS) % NUM_ACCENTS; config_apply_accent(); break;
@@ -925,6 +935,7 @@ static void opt_change(int i, int dir) {
     }
     config_save();
 }
+
 static void to_menu(void) { g_selY = g_menuCur * MENU_H; g_selV = 0; set_mode(M_MENU); }
 
 static void go_back(void) {
@@ -932,6 +943,7 @@ static void go_back(void) {
     else if (g_mode == M_OPT || g_mode == M_ABOUT) to_menu();
     else if (g_mode == M_MENU) set_mode(M_CTRL);
 }
+
 static void handle_input(const PlayerInfo* pi) {
     u32 kd = hidKeysDown(), kh = hidKeysHeld(), ku = hidKeysUp();
     static int repeat = 0;
@@ -1063,7 +1075,8 @@ static void handle_input(const PlayerInfo* pi) {
  * but conditional: sleep is only blocked while the option is on, headphones are plugged in
  * (osIsHeadsetConnected, shared-config flag) and a station is playing. With the lid closed
  * we switch both backlights off (gsp::Lcd) and stop rendering. Otherwise the console sleeps
- * normally; ndsp handles the DSP sleep/wake itself and on wake-up we reconnect the stream. */
+ * normally and on wake-up the audio is restarted and the stream reconnected (see below). */
+
 /* HOME / sleep and the DSP.
  * libctru normally keeps the DSP firmware "suspended" while we are in HOME (or asleep) and then asks it to
  * resume; if that fails it calls svcBreak(USERBREAK_PANIC) = crash. The free OpenDSP firmware does not
