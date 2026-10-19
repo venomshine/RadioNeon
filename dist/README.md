@@ -63,6 +63,6 @@ La app **no incluye ni extrae** firmware de Nintendo. Orden:
 - `favorites.txt`: favoritas (una URL por línea).
 
 ## Notas
-- El HTTPS no verifica certificados.
+- El HTTPS verifica los certificados (raíces de Mozilla incluidas en la app). Si la fecha de la consola está mal, las emisoras https pueden fallar.
 - Si una emisora cae, la app reintenta sola.
 - Créditos: OpenDSP © 2026 Cellenseres (BSD-2-Clause), libctru/citro2d/citro3d (zlib), libcurl, mbedTLS (Apache-2.0), libmpg123 (LGPL-2.1), Helix AAC (RealNetworks RPSL/RCSL), libiconv (LGPL), zlib, fuente Spleen © Frederic Cambus (BSD-2). Licencias en `third_party/` del zip y en `romfs/dsp/`.

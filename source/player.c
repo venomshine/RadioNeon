@@ -21,6 +21,7 @@
 #define NUM_WB        10
 #define WB_FRAMES     4096
 #define CHN           0
+#define CA_BUNDLE     "romfs:/certs/cacert.pem"
 
 typedef enum { CODEC_UNKNOWN, CODEC_MP3, CODEC_AAC } Codec;
 
@@ -268,8 +269,9 @@ static void net_thread(void* arg) {
         curl_easy_setopt(c, CURLOPT_USERAGENT, "RadioNeon3DS/1.0 (Nintendo 3DS; libcurl)");
         curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(c, CURLOPT_MAXREDIRS, 8L);
-        curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 0L);  /* no CA store on the console */
-        curl_easy_setopt(c, CURLOPT_SSL_VERIFYHOST, 0L);
+        curl_easy_setopt(c, CURLOPT_CAINFO, CA_BUNDLE);   /* Mozilla roots in romfs, always verified */
+        curl_easy_setopt(c, CURLOPT_SSL_VERIFYPEER, 1L);
+        curl_easy_setopt(c, CURLOPT_SSL_VERIFYHOST, 2L);
         curl_easy_setopt(c, CURLOPT_CONNECTTIMEOUT, 15L);
         curl_easy_setopt(c, CURLOPT_LOW_SPEED_LIMIT, 512L);
         curl_easy_setopt(c, CURLOPT_LOW_SPEED_TIME, 15L);
