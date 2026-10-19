@@ -213,23 +213,23 @@ static const char* SCRAMBLE[] = {
 };
 #define NSCR (sizeof(SCRAMBLE) / sizeof(SCRAMBLE[0]))
 
-static int u8len(unsigned char c) {
-    if (c < 0x80) return 1;
-    if ((c & 0xE0) == 0xC0) return 2;
-    if ((c & 0xF0) == 0xE0) return 3;
-    if ((c & 0xF8) == 0xF0) return 4;
-    return 1;
+/* length of the UTF-8 sequence at p, never past the terminator (stations.txt may be Latin-1) */
+static int u8len(const char* p) {
+    unsigned char c = (unsigned char)*p;
+    int l = c < 0x80 ? 1 : (c & 0xE0) == 0xC0 ? 2 : (c & 0xF0) == 0xE0 ? 3 : (c & 0xF8) == 0xF0 ? 4 : 1;
+    for (int k = 1; k < l; k++) if (!p[k]) return k;
+    return l;
 }
 
 void hyper_text(const char* src, float progress, char* out, size_t outsz, unsigned seed) {
     int count = 0;
-    for (const char* p = src; *p; p += u8len((unsigned char)*p)) count++;
+    for (const char* p = src; *p; p += u8len(p)) count++;
     int reveal = (int)(progress * count + 0.0001f);
     size_t o = 0;
     int i = 0;
     unsigned r = seed * 2654435761u;
     for (const char* p = src; *p && o + 5 < outsz; i++) {
-        int l = u8len((unsigned char)*p);
+        int l = u8len(p);
         if (i < reveal || *p == ' ') { memcpy(out + o, p, l); o += l; }
         else {
             r = r * 1103515245u + 12345u;
