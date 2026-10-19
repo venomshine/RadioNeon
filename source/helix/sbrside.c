@@ -198,7 +198,7 @@ static void UnpackSBRGrid(BitStreamInfo *bsi, SBRHeader *sbrHdr, SBRGrid *sbrGri
 
 		absBordLead =  0;
 		absBordTrail = NUM_TIME_SLOTS;
-		numRelLead =   sbrGrid->numEnv - 1;
+		numRelLead =   (1 << numEnvRaw) - 1;	/* 0..3, same as numEnv - 1 (lets GCC see the bound) */
 		numRelTrail =  0;
 
 		/* numEnv = 1, 2, or 4 */
