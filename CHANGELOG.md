@@ -12,6 +12,9 @@
 - «ESPAÑOL» sale con la misma fuente que el resto en el selector de idioma.
 - Con la tapa cerrada, si la emisora falla del todo, la consola duerme en vez de quedarse despierta a oscuras.
 - Un 404 ya no mete la página de error en el audio; las URL que son una web o una lista `.m3u`/`.pls` se avisan.
+- Si se va la luz justo al guardar, `config.ini` y `favorites.txt` se recuperan de la copia `.tmp`.
+- Un nombre de emisora en Latin-1 en `stations.txt` ya no puede hacer leer memoria de más al animar el título.
+- Compila sin avisos.
 
 ### Novedades
 - HTTPS con verificación de certificados (raíces de Mozilla).
