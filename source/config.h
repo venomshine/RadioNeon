@@ -24,7 +24,7 @@ void config_load(void);
 void config_save(void);
 void config_apply_accent(void);
 
-/* favourites are stored by URL in sdmc:/3ds/radio3ds/favorites.txt */
+/* favourites are stored by URL in sdmc:/3ds/RadioNeon/favorites.txt */
 void fav_load(void);            /* call after stations_load() */
 bool fav_is(int station);
 void fav_toggle(int station);   /* saves immediately */
