@@ -715,8 +715,10 @@ void player_play(const char* url) {
 }
 
 void player_set_ndsp(bool ok) {
+    LightLock_Lock(&g_lock);
     g_ndspOk = ok;
     if (ok) ndspSetOutputMode(NDSP_OUTPUT_STEREO);
+    LightLock_Unlock(&g_lock);
 }
 
 void player_set_volume(float v) {

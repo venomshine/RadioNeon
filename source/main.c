@@ -41,7 +41,8 @@ static int   g_menuCur = 0, g_optCur = 0;
 static bool  g_dialog = false;
 static float g_dialogT = -10;
 static bool  g_sleepBlocked = false, g_lcdOff = false;
-static volatile bool g_woke = false;
+static int   g_resumeStation = -1;
+static bool  g_audioReady = false, g_audioDown = false;   /* hooks only act after boot, and up only after down */
 static float g_bassEnv = 0, g_bassAvg = 0, g_bassPeak = 0.05f, g_pulse = 0, g_lastBeat = -1;
 static aptHookCookie g_aptCookie;
 static float g_listScroll = 0, g_listVel = 0;
@@ -928,9 +929,51 @@ static void handle_input(const PlayerInfo* pi) {
  * (osIsHeadsetConnected, shared-config flag) and a station is playing. With the lid closed
  * we switch both backlights off (gsp::Lcd) and stop rendering. Otherwise the console sleeps
  * normally; ndsp handles the DSP sleep/wake itself and on wake-up we reconnect the stream. */
+/* HOME / sleep and the DSP.
+ * libctru normally keeps the DSP firmware "suspended" while we are in HOME (or asleep) and then asks it to
+ * resume; if that fails it calls svcBreak(USERBREAK_PANIC) = crash. The free OpenDSP firmware does not
+ * survive that resume reliably (crash on HOME, silent audio after sleep). So:
+ *  - HOME: before leaving (ONSUSPEND) we stop the stream and shut ndsp down completely, so there is
+ *    nothing to resume; on return (ONRESTORE) we start ndsp from scratch, exactly like at boot.
+ *  - sleep: the DSP is suspended by libctru before our hook runs, so on wake-up we restart ndsp from
+ *    scratch anyway and reconnect the station.
+ * All hooks run on the main thread, inside aptMainLoop(), never in the middle of a frame. */
+static void audio_down(const char* why) {
+    if (!g_audioReady || g_audioDown) return;
+    g_audioDown = true;
+    g_resumeStation = g_playing;
+    player_stop();                      /* g_playing is kept: we come back to the same station */
+    player_set_ndsp(false);
+    if (g_fw != FW_NONE) ndspExit();
+    netlog("%s: audio off (station %d)", why, g_resumeStation);
+}
+
+static void audio_up(const char* why) {
+    if (!g_audioDown) return;
+    g_audioDown = false;
+    if (g_fw != FW_NONE) {
+        Result r = ndspInit();
+        if (R_FAILED(r)) {
+            netlog("%s: ndspInit failed %08lX", why, (unsigned long)r);
+            snprintf(g_fwDetail, sizeof(g_fwDetail), "ndspInit %08lX", (unsigned long)r);
+            g_fw = FW_NONE;
+        }
+    }
+    player_set_ndsp(g_fw != FW_NONE);
+    netlog("%s: audio on (%s)%s", why, dspfw_source_name(g_fw), g_resumeStation >= 0 ? ", reconnecting" : "");
+    if (g_resumeStation >= 0 && g_fw != FW_NONE) play_station(g_resumeStation);
+    else if (g_resumeStation >= 0) g_playing = -1;
+    g_resumeStation = -1;
+}
+
 static void apt_cb(APT_HookType hook, void* param) {
     (void)param;
-    if (hook == APTHOOK_ONWAKEUP) g_woke = true;
+    switch (hook) {
+        case APTHOOK_ONSUSPEND: audio_down("home"); break;
+        case APTHOOK_ONRESTORE: audio_up("home"); break;
+        case APTHOOK_ONWAKEUP:  audio_down("wake"); audio_up("wake"); break;
+        default: break;
+    }
 }
 
 static bool power_update(const PlayerInfo* pi) {
@@ -1046,6 +1089,7 @@ int main(int argc, char** argv) {
     g_fw = dspfw_init_audio(dspfw_exists() ? NULL : boot_cb, g_fwDetail, sizeof(g_fwDetail));
     player_set_ndsp(g_fw != FW_NONE);
     player_set_volume(1.0f);   /* fixed: the console's hardware slider controls volume */
+    g_audioReady = true;
     if (g_cfg.autoplay && g_fw != FW_NONE) play_station(g_sel);
 
     u64 t0 = osGetTime();
@@ -1054,11 +1098,6 @@ int main(int argc, char** argv) {
         g_t = (osGetTime() - t0) / 1000.0f;
         hidScanInput();
         player_get_info(&pi);
-        if (g_woke) {   /* reconnect after sleep (the network retries until Wi-Fi is back) */
-            g_woke = false;
-            netlog("wake up%s", g_playing >= 0 ? ": reconnecting" : "");
-            if (g_playing >= 0) play_station(g_playing);
-        }
         if (power_update(&pi)) { gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
         handle_input(&pi);
         player_get_info(&pi);
