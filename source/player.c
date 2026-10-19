@@ -9,11 +9,13 @@
 #include <math.h>
 #include <ctype.h>
 #include <malloc.h>
+#include <unistd.h>
 #include <curl/curl.h>
 #include <mpg123.h>
 #include <iconv.h>
 #include "aacdec.h"
 #include "player.h"
+#include "netlog.h"
 
 #define RING_SIZE     (384 * 1024)
 #define PREBUF_BYTES  (40 * 1024)
@@ -51,6 +53,11 @@ typedef struct Session {
     int  wbCur, wbFill;
     int  rate;
     int  queued;
+
+    /* diagnostics */
+    CURL* curl;
+    bool  gotData;        /* first audio bytes of the current connection seen */
+    u64   bytes;          /* audio bytes of the current connection */
 } Session;
 
 static LightLock g_lock;          /* protects g_cur, g_info, ndsp channel */
@@ -81,6 +88,7 @@ static void set_state(Session* s, PlayerState st) {
 }
 
 static void set_error(Session* s, const char* msg) {
+    netlog("error: %s", msg);
     LightLock_Lock(&g_lock);
     if (s == g_cur) { g_info.state = PS_ERROR; snprintf(g_info.error, sizeof(g_info.error), "%s", msg); }
     LightLock_Unlock(&g_lock);
@@ -219,10 +227,26 @@ static size_t hdr_cb(char* b, size_t sz, size_t nm, void* ud) {
     return n;
 }
 
+static void log_connected(Session* s) {
+    double dns = 0, tcp = 0, tls = 0, first = 0;
+    long code = 0;
+    char* ip = NULL;
+    curl_easy_getinfo(s->curl, CURLINFO_NAMELOOKUP_TIME, &dns);
+    curl_easy_getinfo(s->curl, CURLINFO_CONNECT_TIME, &tcp);
+    curl_easy_getinfo(s->curl, CURLINFO_APPCONNECT_TIME, &tls);
+    curl_easy_getinfo(s->curl, CURLINFO_STARTTRANSFER_TIME, &first);
+    curl_easy_getinfo(s->curl, CURLINFO_RESPONSE_CODE, &code);
+    curl_easy_getinfo(s->curl, CURLINFO_PRIMARY_IP, &ip);
+    netlog("connected: HTTP %ld ip=%s type=%s metaint=%d dns=%.0fms tcp=%.0fms tls=%.0fms first=%.0fms",
+           code, ip ? ip : "?", s->ctype[0] ? s->ctype : "?", s->metaint, dns * 1000, tcp * 1000, tls * 1000, first * 1000);
+}
+
 static size_t write_cb(char* p, size_t sz, size_t nm, void* ud) {
     Session* s = ud;
     size_t n = sz * nm, total = n;
     if (s->stop) return 0;
+    if (!s->gotData) { s->gotData = true; log_connected(s); }
+    s->bytes += n;
     if (s->metaint <= 0) { ring_write(s, (u8*)p, n); return s->stop ? 0 : total; }
     while (n) {
         if (s->icyState == 0) {
@@ -262,6 +286,10 @@ static void net_thread(void* arg) {
     while (!s->stop) {
         CURL* c = curl_easy_init();
         if (!c) { set_error(s, "curl init failed"); break; }
+        char errbuf[CURL_ERROR_SIZE] = "";
+        s->curl = c; s->gotData = false; s->bytes = 0;
+        netlog("connect #%d: %s (wifi=%lu ip=%s)", attempts + 1, s->url, (unsigned long)osGetWifiStrength(), gethostid() ? "yes" : "no");
+        curl_easy_setopt(c, CURLOPT_ERRORBUFFER, errbuf);
         struct curl_slist* h = curl_slist_append(NULL, "Icy-MetaData: 1");
         s->metaint = 0; s->icyState = 0; s->untilMeta = 0;
         curl_easy_setopt(c, CURLOPT_URL, s->url);
@@ -287,7 +315,15 @@ static void net_thread(void* arg) {
         curl_easy_setopt(c, CURLOPT_XFERINFODATA, s);
         CURLcode rc = curl_easy_perform(c);
         long code = 0;
+        double tcp = 0, total = 0;
         curl_easy_getinfo(c, CURLINFO_RESPONSE_CODE, &code);
+        curl_easy_getinfo(c, CURLINFO_CONNECT_TIME, &tcp);
+        curl_easy_getinfo(c, CURLINFO_TOTAL_TIME, &total);
+        if (!s->stop)
+            netlog("closed: curl=%d (%s) HTTP %ld tcp=%.0fms after %.1fs, %llu KB audio%s%s", (int)rc,
+                   errbuf[0] ? errbuf : curl_easy_strerror(rc), code, tcp * 1000, total, (unsigned long long)(s->bytes / 1024),
+                   s->ctype[0] ? ", type=" : "", s->ctype);
+        s->curl = NULL;
         curl_slist_free_all(h);
         curl_easy_cleanup(c);
         if (s->stop) break;
@@ -402,6 +438,7 @@ static void decode_mp3(Session* s) {
     for (size_t i = 0; i < nr; i++) mpg123_format(mh, rates[i], MPG123_STEREO, MPG123_ENC_SIGNED_16);
     mpg123_open_feed(mh);
     set_codec_name(s, "MP3");
+    netlog("decoder: MP3");
     u8* in = malloc(8192);
     s16* out = malloc(32768);
     long rate = 44100; int ch = 2, enc = 0;
@@ -461,6 +498,7 @@ static void decode_aac(Session* s) {
         AACGetLastFrameInfo(h, &fi);
         if (!named) {
             set_codec_name(s, fi.sampRateOut > fi.sampRateCore ? "AAC+" : "AAC");
+            netlog("decoder: %s %d Hz %d ch", fi.sampRateOut > fi.sampRateCore ? "AAC+" : "AAC", fi.sampRateOut, fi.nChans);
             named = true;
         }
         int frames = fi.outputSamps / (fi.nChans ? fi.nChans : 1);
@@ -511,8 +549,9 @@ bool player_init(void) {
     LightLock_Init(&g_lock);
     memset(&g_info, 0, sizeof(g_info));
     svcGetThreadPriority(&g_mainPrio, CUR_THREAD_HANDLE);
+    netlog_init();
     g_socBuf = memalign(0x1000, 0x100000);
-    if (g_socBuf) socInit(g_socBuf, 0x100000);
+    if (g_socBuf) { Result r = socInit(g_socBuf, 0x100000); netlog("socInit: %08lX", (unsigned long)r); }
     curl_global_init(CURL_GLOBAL_DEFAULT);
     mpg123_init();
     return true;
@@ -543,6 +582,7 @@ static Thread spawn(ThreadFunc f, void* arg, size_t stack, int prio, const int* 
 
 void player_play(const char* url) {
     player_stop();
+    netlog("play: %s", url);
     Session* s = calloc(1, sizeof(Session));
     if (!s) return;
     s->ring = malloc(RING_SIZE);

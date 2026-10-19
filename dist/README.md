@@ -61,6 +61,7 @@ La app **no incluye ni extrae** firmware de Nintendo. Orden:
 - `stations.txt`: 20 emisoras por defecto. Formato `Nombre | URL`, una por línea, `#` = comentario. Admite **MP3** y **AAC / AAC+ (HE-AAC v1, ADTS)** por `http://` o `https://`. No admite Ogg/Opus, HLS (.m3u8) ni listas .pls/.m3u.
 - `config.ini`: opciones (acento, idioma, tapa, scanlines, glitch, autoarranque, última emisora).
 - `favorites.txt`: favoritas (una URL por línea).
+- `net.log`: registro de red para diagnosticar problemas (conexiones, tiempos, errores). Si una emisora falla, mándame este archivo. Al pasar de 256 KB se guarda como `net.old.log`.
 
 ## Notas
 - El HTTPS verifica los certificados (raíces de Mozilla incluidas en la app). Si la fecha de la consola está mal, las emisoras https pueden fallar.
