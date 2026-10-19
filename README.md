@@ -1,0 +1,161 @@
+# Radio Neon ラジオネオン
+
+**Radio japonesa por Internet para Nintendo 3DS** · *Japanese internet radio for the Nintendo 3DS*
+
+Hecho por **VENOMSHiNE** · [Discord](https://discord.com/invite/yVKp8JwV4e) · [Ko-fi](https://ko-fi.com/venomshine)
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/W3A028X2KV)
+
+<!-- Capturas: se rehacen con la 1.1.0 (interfaz en inglés por la fuente de Azahar). -->
+
+[Español](#español) · [English](#english)
+
+---
+
+## Español
+
+Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, city pop, clásica, FM locales y noticias. Tiene una estética HUD cyberpunk sobria, con fondo negro carbón y un solo color de acento a tu elección.
+
+### Funciones
+
+- **20 emisoras japonesas** listas para escuchar. Puedes añadir las tuyas en `stations.txt`.
+- **MP3 y AAC / AAC+ (HE-AAC)** por `http://` y `https://`, con el título de la canción en directo (metadatos ICY, también en japonés).
+- **HTTPS verificado** con los certificados raíz de Mozilla incluidos en la app.
+- **Nunca se rinde:** si se corta la emisora o el Wi-Fi, vuelve a conectar sola. Mientras tanto te dice el motivo real (sin Wi-Fi, el servidor no responde, HTTP 404…) y cuánto falta para el siguiente intento.
+- **Favoritas** (Y o tocando la estrella) y **modo aleatorio**: NEXT salta a una emisora al azar sin repetir las últimas.
+- **Osciloscopio y espectro** del audio que suena, con detector de ritmo.
+- **Tapa cerrada + auriculares:** sigue sonando con las pantallas apagadas. Si quitas los auriculares, se para; nunca suena por los altavoces con la tapa cerrada.
+- Pulsar **HOME**, cerrar la tapa y volver: la radio vuelve a conectar sola.
+- Siete colores de acento, scanlines, glitch RGB, y arranque con la última emisora.
+- Español, inglés y japonés (o el idioma de la consola).
+- Registro `net.log` para diagnosticar problemas de red.
+
+### Instalación
+
+**Con FBI y QR (sin cables):** en FBI ve a *Remote Install* → *Scan QR Code* y escanea el QR de la última versión (o escribe la URL):
+
+```
+https://github.com/venomshine/RadioNeon/releases/latest/download/RadioNeon.cia
+```
+
+**Copiando a la SD:**
+- `.cia` (icono en el menú HOME): copia `RadioNeon.cia` a la SD e instálalo con FBI.
+- `.3dsx` (Homebrew Launcher): copia `RadioNeon.3dsx` a `sdmc:/3ds/`.
+
+Necesitas una 3DS / 2DS / New 3DS con CFW (Luma3DS) y Wi-Fi configurado.
+
+### Controles
+
+| Pantalla | Botones |
+|---|---|
+| En todas | **START** salir (pregunta antes) · **L / R** emisora anterior / siguiente |
+| Principal | **A** reproducir / parar · **Y** favorita · **X** menú · **← / →** anterior / siguiente |
+| Lista de emisoras | **↑ / ↓** moverse · **← / →** pasar página · **A** reproducir · **Y** favorita · **B** volver · **SELECT** recargar `stations.txt` |
+| Menú | **↑ / ↓** · **A** abrir · **B** o **X** cerrar |
+| Opciones | **↑ / ↓** · **← / →** o **A** cambiar · **B** volver |
+| Acerca de | **B** volver |
+
+Todo se puede hacer también con la pantalla táctil. El volumen se controla con el deslizador de la consola.
+
+### Archivos en la SD (`sdmc:/3ds/RadioNeon/`)
+
+- `stations.txt`: las emisoras, una por línea con el formato `Nombre | URL`; `#` es un comentario. Si lo borras, se vuelve a crear con la lista por defecto. Formatos: MP3 y AAC/AAC+ (ADTS). No se admiten Ogg/Opus, HLS (`.m3u8`) ni listas `.pls`/`.m3u`: pon la URL directa del stream.
+- `favorites.txt`: tus favoritas (una URL por línea).
+- `config.ini`: las opciones.
+- `net.log`: registro de red. Si una emisora te falla, **mándamelo**. En Azahar está en *Archivo → Abrir carpeta de Azahar* → `sdmc/3ds/RadioNeon/`.
+
+Si vienes de la 1.0.0, la carpeta antigua `sdmc:/3ds/radio3ds` se mueve sola a la nueva.
+
+### Audio (firmware DSP)
+
+La app **no incluye ni extrae firmware de Nintendo**. Si tienes `sdmc:/3ds/dspfirm.cdc` (volcado de tu consola con DSP1), lo usa. Si no, usa **OpenDSP**, un firmware libre (BSD-2) que va dentro de la app. El pie de la pantalla de arriba indica cuál está activo (`DSP:`).
+
+### Compilar
+
+Necesitas [devkitPro](https://devkitpro.org) con `3ds-dev 3ds-curl 3ds-mbedtls 3ds-mpg123 3ds-libiconv` (o la imagen Docker `devkitpro/devkitarm`).
+
+```bash
+make                 # RadioNeon.3dsx
+./build_cia.sh       # RadioNeon.cia (bannertool + makerom)
+```
+
+Los gráficos del icono y del banner se generan con `tools/gen_art.py` y el sonido del HOME con `tools/gen_banner_wav.py`.
+
+### Licencia
+
+Radio Neon está bajo la **Mozilla Public License 2.0** ([LICENSE](LICENSE)). En [NOTICE.md](NOTICE.md) tienes las licencias de terceros y por qué es MPL y no GPL. Créditos: OpenDSP (Cellenseres), Helix AAC (RealNetworks), libmpg123, libcurl, Mbed TLS, libctru/citro2d/citro3d, qrcodegen (Nayuki) y la fuente Spleen (Frederic Cambus).
+
+---
+
+## English
+
+Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city pop, classical, local FM and news. It has a clean cyberpunk HUD look, with a carbon-black background and a single accent colour of your choice.
+
+### Features
+
+- **20 Japanese stations** ready to play. Add your own in `stations.txt`.
+- **MP3 and AAC / AAC+ (HE-AAC)** over `http://` and `https://`, with the live song title (ICY metadata, Japanese included).
+- **Verified HTTPS** with the Mozilla root certificates bundled in the app.
+- **Never gives up:** if the stream or the Wi-Fi drops, it reconnects by itself. Meanwhile it shows the real reason (no Wi-Fi, server not responding, HTTP 404…) and a countdown to the next try.
+- **Favourites** (Y or tap the star) and **shuffle**: NEXT jumps to a random station without repeating the last ones.
+- **Oscilloscope and spectrum** of what is playing, with a beat detector.
+- **Lid closed + headphones:** keeps playing with the screens off. Unplug the headphones and it stops; it never plays through the speakers with the lid closed.
+- Press **HOME**, or close the lid and come back: the radio reconnects by itself.
+- Seven accent colours, scanlines, RGB glitch, and start with the last station.
+- Spanish, English and Japanese (or the console language).
+- `net.log` to diagnose network problems.
+
+### Install
+
+**FBI over QR (no cables):** in FBI go to *Remote Install* → *Scan QR Code* and scan the QR of the latest release (or type the URL):
+
+```
+https://github.com/venomshine/RadioNeon/releases/latest/download/RadioNeon.cia
+```
+
+**Copying to the SD card:**
+- `.cia` (HOME menu icon): copy `RadioNeon.cia` to the SD card and install it with FBI.
+- `.3dsx` (Homebrew Launcher): copy `RadioNeon.3dsx` to `sdmc:/3ds/`.
+
+You need a 3DS / 2DS / New 3DS with CFW (Luma3DS) and Wi-Fi set up.
+
+### Controls
+
+| Screen | Buttons |
+|---|---|
+| Everywhere | **START** exit (asks first) · **L / R** previous / next station |
+| Main | **A** play / stop · **Y** favourite · **X** menu · **← / →** previous / next |
+| Station list | **↑ / ↓** move · **← / →** page · **A** play · **Y** favourite · **B** back · **SELECT** reload `stations.txt` |
+| Menu | **↑ / ↓** · **A** open · **B** or **X** close |
+| Options | **↑ / ↓** · **← / →** or **A** change · **B** back |
+| About | **B** back |
+
+Everything also works with the touch screen. Volume is the console's slider.
+
+### Files on the SD card (`sdmc:/3ds/RadioNeon/`)
+
+- `stations.txt`: one station per line as `Name | URL`; `#` starts a comment. Delete it to get the default list back. Formats: MP3 and AAC/AAC+ (ADTS). Ogg/Opus, HLS (`.m3u8`) and `.pls`/`.m3u` playlists are not supported: use the direct stream URL.
+- `favorites.txt`: your favourites (one URL per line).
+- `config.ini`: the options.
+- `net.log`: network log. If a station fails, **send it to me**.
+
+Coming from 1.0.0, the old `sdmc:/3ds/radio3ds` folder is moved to the new one automatically.
+
+### Audio (DSP firmware)
+
+The app **does not include or extract any Nintendo firmware**. If you have `sdmc:/3ds/dspfirm.cdc` (dumped from your console with DSP1) it uses it; otherwise it uses **OpenDSP**, a free firmware (BSD-2) bundled in the app. The footer of the top screen shows which one is active (`DSP:`).
+
+### Build
+
+You need [devkitPro](https://devkitpro.org) with `3ds-dev 3ds-curl 3ds-mbedtls 3ds-mpg123 3ds-libiconv` (or the `devkitpro/devkitarm` Docker image).
+
+```bash
+make                 # RadioNeon.3dsx
+./build_cia.sh       # RadioNeon.cia (bannertool + makerom)
+```
+
+Icon and banner art: `tools/gen_art.py`; HOME menu sound: `tools/gen_banner_wav.py`.
+
+### License
+
+Radio Neon is released under the **Mozilla Public License 2.0** ([LICENSE](LICENSE)). See [NOTICE.md](NOTICE.md) for third-party licenses and why it is MPL and not GPL. Credits: OpenDSP (Cellenseres), Helix AAC (RealNetworks), libmpg123, libcurl, Mbed TLS, libctru/citro2d/citro3d, qrcodegen (Nayuki) and the Spleen font (Frederic Cambus).

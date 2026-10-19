@@ -1,0 +1,7 @@
+build/
+*.3dsx
+*.cia
+*.elf
+*.smdh
+*.bnr
+tools/_patch.py
