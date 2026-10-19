@@ -6,7 +6,16 @@ Hecho por **VENOMSHiNE** · [Discord](https://discord.com/invite/yVKp8JwV4e) · 
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/W3A028X2KV)
 
-<!-- Capturas: se rehacen con la 1.1.0 (interfaz en inglés por la fuente de Azahar). -->
+| | | |
+|:-:|:-:|:-:|
+| ![On air](docs/screenshots/02_on_air.png) | ![Station list](docs/screenshots/04_station_list.png) | ![Menu](docs/screenshots/05_menu.png) |
+| ON AIR | Station list / Lista | Menu / Menú |
+| ![Options](docs/screenshots/06_options.png) | ![About](docs/screenshots/08_about_qr.png) | ![Network retry](docs/screenshots/10_network_retry.png) |
+| Options / Opciones | About + QR / Acerca de | Network retry / Reintento |
+| ![Boot](docs/screenshots/01_boot_opendsp.png) | ![Red accent](docs/screenshots/11_accent_red.png) | ![UV accent](docs/screenshots/12_accent_uv.png) |
+| OpenDSP boot / Arranque | Red / Rojo | UV purple / Morado UV |
+
+<sub>Capturas de la 1.1.0 en Azahar con la interfaz en inglés · 1.1.0 screenshots in Azahar, English UI. Más / more: [docs/screenshots](docs/screenshots) · 1.0.0: [docs/screenshots-1.0.0](docs/screenshots-1.0.0)</sub>
 
 [Español](#español) · [English](#english)
 
@@ -33,6 +42,8 @@ Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, ci
 ### Instalación
 
 **Con FBI y QR (sin cables):** en FBI ve a *Remote Install* → *Scan QR Code* y escanea el QR de la última versión (o escribe la URL):
+
+<img src="docs/screenshots/fbi_qr.png" alt="QR RadioNeon.cia" width="200">
 
 ```
 https://github.com/venomshine/RadioNeon/releases/latest/download/RadioNeon.cia
@@ -108,6 +119,8 @@ Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city
 ### Install
 
 **FBI over QR (no cables):** in FBI go to *Remote Install* → *Scan QR Code* and scan the QR of the latest release (or type the URL):
+
+<img src="docs/screenshots/fbi_qr.png" alt="RadioNeon.cia QR" width="200">
 
 ```
 https://github.com/venomshine/RadioNeon/releases/latest/download/RadioNeon.cia
