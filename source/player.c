@@ -339,12 +339,12 @@ static int net_ready(int* arg) {
     return NE_NOWIFI;
 }
 
-static int classify(CURLcode rc, long code, double tcp, int* arg) {
+static int classify(CURLcode rc, long code, u64 bytes, int* arg) {
     switch (rc) {
         case CURLE_HTTP_RETURNED_ERROR: *arg = (int)code; return NE_HTTP;
         case CURLE_COULDNT_RESOLVE_HOST: return NE_DNS;
         case CURLE_COULDNT_CONNECT: return NE_CONNECT;
-        case CURLE_OPERATION_TIMEDOUT: return tcp > 0 ? NE_CUT : NE_TIMEOUT;
+        case CURLE_OPERATION_TIMEDOUT: return bytes ? NE_CUT : NE_TIMEOUT;   /* no audio yet: "not responding" */
         case CURLE_PEER_FAILED_VERIFICATION: return NE_CERT;
         case CURLE_SSL_CONNECT_ERROR: return NE_TLS;
         case CURLE_OK: case CURLE_RECV_ERROR: case CURLE_SEND_ERROR:
@@ -425,13 +425,13 @@ static void net_thread(void* arg) {
             break;
         }
         if (s->bytes >= 64 * 1024) attempts = 0;   /* it was playing fine: start the back-off again */
-        int earg = 0, err = classify(rc, code, tcp, &earg);
-        int wait = BACKOFF[attempts < 6 ? attempts : 5];
-        if ((err == NE_HTTP && code < 500) || err == NE_CERT) wait = 30;
+        int earg = 0, err = classify(rc, code, s->bytes, &earg);
+        int delay = BACKOFF[attempts < 6 ? attempts : 5];
+        if ((err == NE_HTTP && code < 500) || err == NE_CERT) delay = 30;
         attempts++;
-        netlog("retry in %d s (reason %d, arg %d)", wait, err, earg);
-        set_neterr(s, err, earg, osGetTime() + wait * 1000ULL);
-        wait_ms(s, wait * 1000);
+        netlog("retry in %d s (reason %d, arg %d)", delay, err, earg);
+        set_neterr(s, err, earg, osGetTime() + delay * 1000ULL);
+        wait_ms(s, delay * 1000);
         if (!s->stop) set_neterr(s, err, earg, 0);   /* "retrying..." */
     }
     LightLock_Lock(&s->lock);
