@@ -108,37 +108,22 @@ AccessControlInfo:
     WaitSynchronization1: 36
     WaitSynchronizationN: 37
   InterruptNumbers:
+  # Only what the app uses: apt, ac (Wi-Fi state), cfg (language), dsp (audio), fs, gsp (+Lcd backlights),
+  # hid, mcu::HWC (exact battery %), ndm, ptm (+sysm for the New 3DS speed-up), soc (network)
   ServiceAccessControl:
    - APT:U
    - ac:u
-   - am:net
-   - boss:U
-   - cam:u
-   - cecd:u
-   - cfg:nor
    - cfg:u
-   - csnd:SND
    - dsp::DSP
-   - frd:u
    - fs:USER
    - gsp::Gpu
    - gsp::Lcd
    - hid:USER
-   - http:C
-   - ir:rst
-   - ir:u
-   - ir:USER
-   - mic:u
+   - mcu::HWC
    - ndm:u
-   - news:s
-   - nwm::EXT
-   - nwm::UDS
    - ptm:sysm
    - ptm:u
-   - pxi:dev
    - soc:U
-   - ssl:C
-   - y2r:u
 
 SystemControlInfo:
   SaveDataSize: 0KB

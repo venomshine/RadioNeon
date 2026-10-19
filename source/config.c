@@ -31,6 +31,15 @@ void config_apply_accent(void) {
     g_accent = C2D_Color32(a->r, a->g, a->b, 255);
 }
 
+/* write to path.tmp, then replace: a power cut never leaves a half-written file */
+static bool commit_file(FILE* f, const char* tmp, const char* path) {
+    bool ok = fflush(f) == 0;
+    ok = (fclose(f) == 0) && ok;
+    if (!ok) { remove(tmp); return false; }
+    remove(path);              /* FAT rename does not overwrite */
+    return rename(tmp, path) == 0;
+}
+
 static bool parse_bool(const char* v) { return *v == '1' || *v == 't' || *v == 'T' || *v == 'o' || *v == 'O' || *v == 'y'; }
 
 static void read_file(const char* path) {
@@ -63,12 +72,12 @@ void config_load(void) {
 }
 
 void config_save(void) {
-    FILE* f = fopen(CFG_PATH, "wb");
+    FILE* f = fopen(CFG_PATH ".tmp", "wb");
     if (!f) return;
     fprintf(f, "# " APP_NAME " " APP_VERSION " config\n");
     fprintf(f, "station=%d\naccent=%d\nlid_play=%d\nscanlines=%d\nglitch=%d\nautoplay=%d\nlang=%d\n",
             g_cfg.station, g_cfg.accent, g_cfg.lidPlay, g_cfg.scanlines, g_cfg.glitch, g_cfg.autoplay, g_cfg.lang);
-    fclose(f);
+    commit_file(f, CFG_PATH ".tmp", CFG_PATH);
 }
 
 void fav_load(void) {
@@ -86,11 +95,11 @@ void fav_load(void) {
 }
 
 static void fav_save(void) {
-    FILE* f = fopen(FAV_PATH, "wb");
+    FILE* f = fopen(FAV_PATH ".tmp", "wb");
     if (!f) return;
     fprintf(f, "# Radio Neon favoritas (una URL por linea)\n");
     for (int i = 0; i < g_stationCount; i++) if (g_fav[i]) fprintf(f, "%s\n", g_stations[i].url);
-    fclose(f);
+    commit_file(f, FAV_PATH ".tmp", FAV_PATH);
 }
 
 bool fav_is(int i) { return i >= 0 && i < g_stationCount && g_fav[i]; }
