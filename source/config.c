@@ -64,7 +64,16 @@ static void read_file(const char* path) {
     fclose(f);
 }
 
+/* commit_file() only removes the old file once the .tmp is complete: if the power went off between
+   remove() and rename(), the .tmp is the good copy */
+static void recover_tmp(const char* tmp, const char* path) {
+    FILE* f = fopen(path, "rb");
+    if (f) { fclose(f); return; }
+    rename(tmp, path);
+}
+
 void config_load(void) {
+    recover_tmp(CFG_PATH ".tmp", CFG_PATH);
     FILE* f = fopen(CFG_PATH, "rb");
     if (f) { fclose(f); read_file(CFG_PATH); }
     else read_file(OLD_PATH);          /* older settings.txt (station only) */
@@ -83,6 +92,7 @@ void config_save(void) {
 
 void fav_load(void) {
     memset(g_fav, 0, sizeof(g_fav));
+    recover_tmp(FAV_PATH ".tmp", FAV_PATH);
     FILE* f = fopen(FAV_PATH, "rb");
     if (!f) return;
     char line[400];
