@@ -31,15 +31,15 @@ include $(DEVKITARM)/3ds_rules
 #     - icon.png
 #     - <libctru folder>/default_icon.png
 #---------------------------------------------------------------------------------
-TARGET		:=	radio3ds
+TARGET		:=	RadioNeon
 BUILD		:=	build
-SOURCES		:=	source source/helix
+SOURCES		:=	source source/helix lib
 DATA		:=	data
-INCLUDES	:=	include
+INCLUDES	:=	include lib
 GRAPHICS	:=	
 GFXBUILD	:=	$(BUILD)
 ROMFS		:=	romfs
-APP_TITLE	:=	Radio Neon ラジオネオン
+APP_TITLE	:=	Radio Neon
 APP_DESCRIPTION	:=	Japanese internet radio / 日本のラジオ
 APP_AUTHOR	:=	VENOMSHiNE
 ICON		:=	meta/icon.png

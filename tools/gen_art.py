@@ -74,4 +74,3 @@ scan(im,S)
 im.resize((W,H),Image.LANCZOS).save("meta/banner.png")
 
 print("ok")
-print("ok")

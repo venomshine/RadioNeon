@@ -4,9 +4,10 @@
 #include <time.h>
 #include <sys/stat.h>
 #include "netlog.h"
+#include "app.h"
 
-#define LOG_PATH "sdmc:/3ds/radio3ds/net.log"
-#define OLD_PATH "sdmc:/3ds/radio3ds/net.old.log"
+#define LOG_PATH APP_DIR "/net.log"
+#define OLD_PATH APP_DIR "/net.old.log"
 #define LOG_MAX  (256 * 1024)
 
 static LightLock g_logLock;
@@ -16,7 +17,7 @@ void netlog_init(void) {
     if (g_logInit) return;
     LightLock_Init(&g_logLock);
     g_logInit = true;
-    netlog("==== Radio Neon 1.0.0 start ====");
+    netlog("==== " APP_NAME " " APP_VERSION " start ====");
 }
 
 void netlog(const char* fmt, ...) {

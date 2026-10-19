@@ -16,6 +16,7 @@
 #include "aacdec.h"
 #include "player.h"
 #include "netlog.h"
+#include "app.h"
 
 #define RING_SIZE     (384 * 1024)
 #define PREBUF_BYTES  (40 * 1024)
@@ -383,7 +384,7 @@ static void net_thread(void* arg) {
         s->metaint = 0; s->icyState = 0; s->untilMeta = 0;
         curl_easy_setopt(c, CURLOPT_URL, s->url);
         curl_easy_setopt(c, CURLOPT_HTTPHEADER, h);
-        curl_easy_setopt(c, CURLOPT_USERAGENT, "RadioNeon3DS/1.0 (Nintendo 3DS; libcurl)");
+        curl_easy_setopt(c, CURLOPT_USERAGENT, "RadioNeon/" APP_VERSION " (Nintendo 3DS; libcurl)");
         curl_easy_setopt(c, CURLOPT_FOLLOWLOCATION, 1L);
         curl_easy_setopt(c, CURLOPT_MAXREDIRS, 8L);
         curl_easy_setopt(c, CURLOPT_CAINFO, CA_BUNDLE);   /* Mozilla roots in romfs, always verified */

@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include "stations.h"
+#include "app.h"
 
-#define DIR_PATH  "sdmc:/3ds/radio3ds"
+#define DIR_PATH  APP_DIR
 #define FILE_PATH DIR_PATH "/stations.txt"
 #define SET_PATH  DIR_PATH "/settings.txt"
 
@@ -73,6 +74,8 @@ static void parse_list(const char* text) {
 
 int stations_load(void) {
     mkdir("sdmc:/3ds", 0777);
+    struct stat st;   /* 1.0.0 used sdmc:/3ds/radio3ds: move it once so nothing is lost */
+    if (stat(DIR_PATH, &st) != 0 && stat(APP_OLD_DIR, &st) == 0) rename(APP_OLD_DIR, DIR_PATH);
     mkdir(DIR_PATH, 0777);
     FILE* f = fopen(FILE_PATH, "rb");
     if (!f) {
