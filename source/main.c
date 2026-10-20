@@ -781,7 +781,7 @@ static void render_about(void) {
     C2D_DrawRectSolid(12, wy - 3, 0, 296, 1, COL_LINE);
     C2D_DrawRectSolid(12, wy - 3, 0, 30, 1, COL_ACC);
     int total = (NL + 3) * LH + (int)wh;   /* credits + gap + the Nintendo note, then it starts again */
-    float off = fmodf(g_t * 14, (float)total);
+    float off = fmodf((g_t - g_modeT) * 14, (float)total);   /* from the top every time About opens */
     scissor_begin(false, 10, wy, 300, wh);
     float y0 = wy + wh - off;
     lbl(T(S_CREDITS), 160, y0, 1, COL_ACC, 1);
