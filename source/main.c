@@ -488,7 +488,7 @@ static Btn B_DOK = { 44, 128, 112, 36, 0 }, B_DNO = { 164, 128, 112, 36, 0 }, B_
 #define LIST_Y 32
 #define MENU_Y 36
 #define MENU_H 46
-#define NMENU 4
+enum { MI_ALL, MI_FAV, MI_HIST, MI_SAVED, MI_OPT, MI_ABOUT, MI_EXIT, NMENU };
 #define NOPT 6
 enum { OPT_ACCENT, OPT_LANG, OPT_LID, OPT_AUTO, OPT_SCAN, OPT_GLITCH };
 static const float OPT_Y[NOPT] = { 31, 74, 106, 138, 170, 202 };
@@ -792,34 +792,62 @@ static void render_list(const PlayerInfo* pi) {
 }
 
 /* ---------------- menu root */
-static const char* MENU_KANJI[NMENU] = { "放送局", "お気に入り", "設定", "情報" };
+static const char* MENU_KANJI[NMENU] = { "放送局", "お気に入り", "履歴", "保存曲", "設定", "情報", "終了" };
+static const StrId MENU_LABEL[NMENU] = { S_MENU_ALL, S_MENU_FAV, S_MENU_HIST, S_MENU_SAVED, S_MENU_OPT, S_MENU_ABOUT, S_MENU_EXIT };
+static float g_menuScroll = 0;
+static bool  g_menuFree = false;   /* dragged by touch: do not follow the cursor until a key moves it */
+#define MENU_VIS (SCR_H - MENU_Y)
+static float menu_max_scroll(void) { float m = NMENU * MENU_H - MENU_VIS; return m > 0 ? m : 0; }
+static int liked_count(void) { int n = 0; for (int k = 0; k < g_songCount; k++) n += g_songs[k].liked; return n; }
 
 static void render_menu(void) {
     spring_to(g_menuCur * MENU_H);
-    sub_header("MENU//SYS", "メニュー", "V" APP_VERSION);
+    if (!g_menuFree) {   /* keep the cursor in view */
+        float target = g_menuCur * MENU_H - (MENU_VIS - MENU_H) / 2;
+        if (target > menu_max_scroll()) target = menu_max_scroll();
+        if (target < 0) target = 0;
+        g_menuScroll += (target - g_menuScroll) * 0.25f;
+    }
     dashed_vline(5, LIST_Y, SCR_H, 3, 3, COL_LINE);
-    float hy = MENU_Y + g_selY;
+    scissor_begin(false, 0, MENU_Y - 4, BOT_W, SCR_H - MENU_Y + 4);
+    float hy = MENU_Y + g_selY - g_menuScroll;
     C2D_DrawRectSolid(4, hy + 8, 0, 3, MENU_H - 20, COL_ACC);
     for (int i = 0; i < NMENU; i++) {
-        float y = MENU_Y + i * MENU_H;
+        float y = MENU_Y + i * MENU_H - g_menuScroll;
+        if (y < MENU_Y - MENU_H || y > SCR_H) continue;
         bool sel = i == g_menuCur;
-        ch_fill(12, y + 2, 296, MENU_H - 6, 7, CUT_TL | CUT_BR, sel ? COL_CARBON : COL_PANEL);
-        ch_outline(12, y + 2, 296, MENU_H - 6, 7, CUT_TL | CUT_BR, sel ? COL_ACC : COL_LINE, 1);
-        if (sel) brackets(10, y, 300, MENU_H - 2, 5, col_a(COL_ACC, 0.5f + 0.5f * sinf(g_t * 6)), 1);
-        char num[8]; snprintf(num, sizeof(num), "0%d", i + 1);
-        if (sel) { ch_fill(20, y + 12, 22, 16, 3, CUT_TL | CUT_BR, COL_ACC); mono_draw(num, 31, y + 16, 1, COL_BLACK, 1); }
+        bool exit = i == MI_EXIT;
+        ch_fill(12, y + 2, 292, MENU_H - 6, 7, CUT_TL | CUT_BR, sel ? COL_CARBON : COL_PANEL);
+        ch_outline(12, y + 2, 292, MENU_H - 6, 7, CUT_TL | CUT_BR, sel ? (exit ? COL_RED : COL_ACC) : COL_LINE, 1);
+        if (sel) brackets(10, y, 296, MENU_H - 2, 5, col_a(exit ? COL_RED : COL_ACC, 0.5f + 0.5f * sinf(g_t * 6)), 1);
+        char num[8]; snprintf(num, sizeof(num), "%02d", i + 1);
+        if (sel) { ch_fill(20, y + 12, 22, 16, 3, CUT_TL | CUT_BR, exit ? COL_RED : COL_ACC); mono_draw(num, 31, y + 16, 1, COL_BLACK, 1); }
         else mono_draw(num, 31, y + 16, 1, COL_DIM, 1);
-        lbl(T((StrId)(S_MENU_ALL + i)), 52, y + 10, 2, sel ? COL_TEXT : col_a(COL_TEXT, 0.7f), 0);
+        lbl(T(MENU_LABEL[i]), 52, y + 10, 2, sel ? COL_TEXT : col_a(COL_TEXT, 0.7f), 0);
         char sub[96];
-        if (i == 0) snprintf(sub, sizeof(sub), T(S_SUB_ALL), g_stationCount);
-        else if (i == 1) snprintf(sub, sizeof(sub), T(S_SUB_FAV), fav_count());
-        else if (i == 2) snprintf(sub, sizeof(sub), T(S_SUB_OPT), acc_name(g_cfg.accent));
-        else snprintf(sub, sizeof(sub), "%s", T(S_SUB_ABOUT));
+        switch (i) {
+            case MI_ALL:   snprintf(sub, sizeof(sub), T(S_SUB_ALL), g_stationCount); break;
+            case MI_FAV:   snprintf(sub, sizeof(sub), T(S_SUB_FAV), fav_count()); break;
+            case MI_HIST:  snprintf(sub, sizeof(sub), T(S_SUB_HIST), g_songCount); break;
+            case MI_SAVED: snprintf(sub, sizeof(sub), T(S_SUB_SAVED), liked_count()); break;
+            case MI_OPT:   snprintf(sub, sizeof(sub), T(S_SUB_OPT), acc_name(g_cfg.accent)); break;
+            case MI_ABOUT: snprintf(sub, sizeof(sub), "%s", T(S_SUB_ABOUT)); break;
+            default:       snprintf(sub, sizeof(sub), "%s", T(S_SUB_EXIT)); break;
+        }
         lbl(sub, 52, y + 28, 1, col_a(COL_DIM, sel ? 1 : 0.7f), 0);
-        if (g_lang != LANG_JA) text_draw(MENU_KANJI[i], 300, y + 23, 0.42f, col_a(COL_ACC, sel ? 0.7f : 0.3f), 2);
-        if (i == 1) star(296, y + 13, 4.5f, fav_count() > 0, sel ? COL_ACC : COL_DIM);
-        else mono_draw(">", 300, y + 10, 1, sel ? COL_ACC : COL_DIM, 2);
+        u32 ic = sel ? (exit ? COL_RED : COL_ACC) : COL_DIM;
+        if (g_lang != LANG_JA) text_draw(MENU_KANJI[i], 296, y + 23, 0.42f, col_a(exit ? COL_RED : COL_ACC, sel ? 0.7f : 0.3f), 2);
+        if (i == MI_FAV) star(292, y + 13, 4.5f, fav_count() > 0, ic);
+        else if (i == MI_SAVED) heart(292, y + 13, 4.5f, liked_count() > 0, ic);
+        else mono_draw(">", 296, y + 10, 1, ic, 2);
     }
+    scissor_end();
+    /* scrollbar */
+    float track = MENU_VIS - 8, total = NMENU * MENU_H;
+    float th = track * MENU_VIS / total, ty = MENU_Y + (track - th) * (g_menuScroll / menu_max_scroll());
+    C2D_DrawRectSolid(312, MENU_Y, 0, 1, track, COL_LINE);
+    C2D_DrawRectSolid(311, ty, 0, 3, th, COL_ACC);
+    sub_header("MENU//SYS", "メニュー", "V" APP_VERSION);
 }
 
 /* ---------------- options */
@@ -1082,23 +1110,35 @@ static void render_sleep(void) {
 }
 
 /* ---------------- song history */
-static int   g_songCur = 0;
+static int   g_songCur = 0;        /* index in g_hview */
 static float g_songScroll = 0;
+static bool  g_histSaved = false;  /* only the songs saved with a heart */
+static int   g_histFrom = M_CTRL;
+static int   g_hview[HIST_MAX], g_hviewN = 0;
+
+/* the rows on screen: every song, or only the saved ones (rebuilt every frame: songs come and go) */
+static void hist_view(void) {
+    g_hviewN = 0;
+    for (int k = 0; k < g_songCount; k++) if (!g_histSaved || g_songs[k].liked) g_hview[g_hviewN++] = k;
+    if (g_songCur >= g_hviewN) g_songCur = g_hviewN ? g_hviewN - 1 : 0;
+}
+static int hist_cur(void) { return g_hviewN ? g_hview[g_songCur] : -1; }
 #define HIST_OPEN_DROP 0.10f   /* a line drops from the button to the bottom edge... */
 #define HIST_OPEN_RISE 0.16f   /* ...and the screen opens upwards behind it */
 
 static void render_history(void) {
+    hist_view();
     float vis = SCR_H - LIST_Y, target = g_songCur * ROW_H - vis / 2 + ROW_H / 2;
-    float mx = g_songCount * ROW_H - vis;
+    float mx = g_hviewN * ROW_H - vis;
     if (target > mx) target = mx;
     if (target < 0) target = 0;
     g_songScroll += (target - g_songScroll) * 0.3f;
     dashed_vline(5, LIST_Y, SCR_H, 3, 3, COL_LINE);
     scissor_begin(false, 0, LIST_Y, BOT_W, vis);
-    for (int k = 0; k < g_songCount; k++) {
+    for (int k = 0; k < g_hviewN; k++) {
         float y = LIST_Y + k * ROW_H - g_songScroll;
         if (y < LIST_Y - ROW_H || y > SCR_H) continue;
-        const HistEntry* e = &g_songs[k];
+        const HistEntry* e = &g_songs[g_hview[k]];
         bool sel = k == g_songCur;
         if (sel) {
             ch_fill(14, y + 1, 292, ROW_H - 2, 5, CUT_TL | CUT_BR, COL_CARBON);
@@ -1112,16 +1152,17 @@ static void render_history(void) {
         heart(292, y + ROW_H / 2, 6, e->liked, e->liked ? COL_ACC : col_a(COL_DIM, 0.6f));
     }
     scissor_end();
-    if (!g_songCount) {
-        icon_history(160, 96, col_a(COL_ACC, 0.6f));
-        lbl(T(S_HIST_EMPTY), 160, 120, 2, COL_TEXT, 1);
-        lbl(T(S_HIST_EMPTY1), 160, 146, 1, COL_DIM, 1);
-        lbl(T(S_HIST_EMPTY2), 160, 158, 1, COL_DIM, 1);
+    if (!g_hviewN) {
+        if (g_histSaved) heart(160, 96, 9, false, col_a(COL_ACC, 0.6f));
+        else icon_history(160, 96, col_a(COL_ACC, 0.6f));
+        lbl(T(g_histSaved ? S_SAVED_EMPTY : S_HIST_EMPTY), 160, 120, 2, COL_TEXT, 1);
+        lbl(T(g_histSaved ? S_SAVED_EMPTY1 : S_HIST_EMPTY1), 160, 146, 1, COL_DIM, 1);
+        lbl(T(g_histSaved ? S_SAVED_EMPTY2 : S_HIST_EMPTY2), 160, 158, 1, COL_DIM, 1);
     }
-    int liked = 0;
-    for (int k = 0; k < g_songCount; k++) liked += g_songs[k].liked;
-    char cnt[24]; snprintf(cnt, sizeof(cnt), "%d // %d  ", g_songCount, liked);
-    sub_header(T(S_HDR_HIST), "履歴", cnt);
+    char cnt[24];
+    if (g_histSaved) snprintf(cnt, sizeof(cnt), "%d  ", g_hviewN);
+    else snprintf(cnt, sizeof(cnt), "%d // %d  ", g_songCount, liked_count());
+    sub_header(T(g_histSaved ? S_HDR_SAVED : S_HDR_HIST), g_histSaved ? "保存曲" : "履歴", cnt);
     heart(303, 15, 4.5f, true, COL_ACC);
 }
 
@@ -1164,8 +1205,8 @@ static void render_top_hist(void) {
     static char done[600] = "";   /* what the QR holds now: encoded once */
     static bool ok = false;
     float ty = 129 - 46;
-    if (g_histSongQR && g_songCount) {
-        const HistEntry* e = &g_songs[g_songCur];
+    if (g_histSongQR && hist_cur() >= 0) {
+        const HistEntry* e = &g_songs[hist_cur()];
         char url[600];
         spotify_url(e->title, url, sizeof(url));
         if (strcmp(done, url)) { ok = qrcodegen_encodeText(url, tmp, qr, qrcodegen_Ecc_LOW, 3, 25, qrcodegen_Mask_AUTO, true); snprintf(done, sizeof(done), "%s", url); }
@@ -1192,12 +1233,12 @@ static void render_top_hist(void) {
             text_draw(T(S_LINK_SCAN2), tx, ty + 42, 0.55f, COL_TEXT, 0);
             mono_draw(url + 7, tx, ty + 68, 1, COL_DIM, 0);   /* without "http://" */
             text_draw(T(S_LINK_NET), tx, ty + 78, 0.42f, COL_DIM, 0);
-            if (g_songCount) text_draw(T(S_LINK_A), tx, ty + 98, 0.42f, COL_ACC, 0);
+            if (g_hviewN) text_draw(T(S_LINK_A), tx, ty + 98, 0.42f, COL_ACC, 0);
         } else {   /* no Wi-Fi: no address to give */
             mono_draw("PHONE LINK", 200, ty + 10, 2, COL_DIM, 1);
             lbl(T(S_LINK_NOWIFI), 200, ty + 40, 2, COL_TEXT, 1);
             text_draw(T(S_LINK_NOWIFI2), 200, ty + 62, 0.5f, COL_DIM, 1);
-            if (g_songCount) text_draw(T(S_LINK_A), 200, ty + 98, 0.42f, COL_ACC, 1);
+            if (g_hviewN) text_draw(T(S_LINK_A), 200, ty + 98, 0.42f, COL_ACC, 1);
         }
     }
     scanlines(TOP_W);
@@ -1323,12 +1364,17 @@ static void toggle_fav(int i) {
     if (g_mode == M_LIST && g_favView) build_view();   /* the cursor stays put; the current station does not change */
 }
 
+static void open_history(bool saved, int from);
+
 static void menu_select(int i) {
     switch (i) {
-        case 0: open_list(false, M_MENU); break;
-        case 1: open_list(true, M_MENU); break;
-        case 2: g_optCur = 0; g_selY = OPT_Y[0]; g_selV = 0; set_mode(M_OPT); break;
-        default: set_mode(M_ABOUT); break;
+        case MI_ALL:   open_list(false, M_MENU); break;
+        case MI_FAV:   open_list(true, M_MENU); break;
+        case MI_HIST:  open_history(false, M_MENU); break;
+        case MI_SAVED: open_history(true, M_MENU); break;
+        case MI_OPT:   g_optCur = 0; g_selY = OPT_Y[0]; g_selV = 0; set_mode(M_OPT); break;
+        case MI_ABOUT: set_mode(M_ABOUT); break;
+        default:       open_dialog(); break;
     }
 }
 
@@ -1392,9 +1438,13 @@ static void save_now_song(const PlayerInfo* pi) {
     netlog("history: %s \"%s\"", like ? "saved" : "unsaved", pi->title);
 }
 
-static void open_history(void) {
+static void open_history(bool saved, int from) {
     g_songCur = 0; g_songScroll = 0; g_histSongQR = false;
+    g_histSaved = saved; g_histFrom = from;
+    bool anim = g_mode == M_CTRL;   /* the line that drops from the button: only from the panel */
+    hist_view();
     set_mode(M_HIST);
+    if (!anim) g_modeT -= HIST_OPEN_DROP + HIST_OPEN_RISE;
 }
 
 static void toggle_song_like(int k) {
@@ -1404,11 +1454,13 @@ static void toggle_song_like(int k) {
     if (!g_batLock) player_beep(like ? 0 : 1);
 }
 
+static void open_menu(void) { g_menuCur = 0; g_selY = 0; g_selV = 0; g_menuScroll = 0; g_menuFree = false; set_mode(M_MENU); }
 static void to_menu(void) { g_selY = g_menuCur * MENU_H; g_selV = 0; set_mode(M_MENU); }
 
 static void go_back(void) {
     if (g_mode == M_LIST) { if (g_listFrom == M_MENU) to_menu(); else set_mode(M_CTRL); }
     else if (g_mode == M_OPT || g_mode == M_ABOUT) to_menu();
+    else if (g_mode == M_HIST && g_histFrom == M_MENU) to_menu();
     else if (g_mode == M_MENU || g_mode == M_SLEEP || g_mode == M_HIST) set_mode(M_CTRL);
 }
 
@@ -1463,8 +1515,12 @@ static void handle_input(const PlayerInfo* pi) {
      *   MENU       : UP/DOWN · A open · B close
      *   OPTIONS    : UP/DOWN · LEFT/RIGHT or A change · B back
      *   ABOUT      : B back */
-    if (startTap) { if (g_mode == M_MENU) set_mode(M_CTRL); else { g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); } return; }
-    if (kd & KEY_X) { if (g_mode == M_HIST) go_back(); else { B_HIST.press = 1; open_history(); } return; }
+    if (startTap) { if (g_mode == M_MENU) set_mode(M_CTRL); else { open_menu(); } return; }
+    if (kd & KEY_X) {
+        if (g_mode == M_HIST) set_mode(M_CTRL);
+        else { if (g_mode == M_CTRL) B_HIST.press = 1; open_history(false, M_CTRL); }
+        return;
+    }
     if (kd & KEY_SELECT) { if (g_mode == M_LIST) go_back(); else open_list(false, M_CTRL); return; }
     if (g_mode == M_CTRL) {
         if (kd & KEY_L) { B_SHUF.press = 1; toggle_shuffle(); }
@@ -1505,7 +1561,7 @@ static void handle_input(const PlayerInfo* pi) {
         case M_MENU:
             if (kd & KEY_A) menu_select(g_menuCur);
             if (kd & KEY_B) set_mode(M_CTRL);
-            if (vert) g_menuCur = (g_menuCur + vert + NMENU) % NMENU;
+            if (vert) { g_menuCur = (g_menuCur + vert + NMENU) % NMENU; g_menuFree = false; }
             break;
         case M_OPT:
             if (kd & KEY_A) opt_change(g_optCur, 1);
@@ -1514,14 +1570,15 @@ static void handle_input(const PlayerInfo* pi) {
             if (horiz) opt_change(g_optCur, horiz);
             break;
         case M_HIST:
-            if ((kd & KEY_A) && g_songCount) g_histSongQR = true;   /* top: Spotify of the song */
+            hist_view();
+            if ((kd & KEY_A) && g_hviewN) g_histSongQR = true;   /* top: Spotify of the song */
             if (kd & KEY_B) { if (g_histSongQR) g_histSongQR = false; else go_back(); }
-            if (kd & KEY_Y) toggle_song_like(g_songCur);
-            if (vert && g_songCount) g_songCur = (g_songCur + vert + g_songCount) % g_songCount;
-            if (horiz && g_songCount) {
+            if (kd & KEY_Y) toggle_song_like(hist_cur());
+            if (vert && g_hviewN) g_songCur = (g_songCur + vert + g_hviewN) % g_hviewN;
+            if (horiz && g_hviewN) {
                 g_songCur += horiz * 6;
                 if (g_songCur < 0) g_songCur = 0;
-                if (g_songCur >= g_songCount) g_songCur = g_songCount - 1;
+                if (g_songCur >= g_hviewN) g_songCur = g_hviewN - 1;
             }
             break;
         case M_SLEEP:
@@ -1544,15 +1601,14 @@ static void handle_input(const PlayerInfo* pi) {
             else if (hit(&B_CSTAR, x, y)) { press(&B_CSTAR, x, y); toggle_fav(g_sel); }
             else if (hit(&B_SHUF, x, y)) { press(&B_SHUF, x, y); toggle_shuffle(); }
             else if (hit(&B_SLEEP, x, y)) { press(&B_SLEEP, x, y); open_sleep(); }
-            else if (hit(&B_HIST, x, y)) { press(&B_HIST, x, y); open_history(); }
+            else if (hit(&B_HIST, x, y)) { press(&B_HIST, x, y); open_history(false, M_CTRL); }
             else if (hit(&B_CARD, x, y)) { press(&B_CARD, x, y); open_list(false, M_CTRL); }
-            else if (hit(&B_MENU, x, y)) { press(&B_MENU, x, y); g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); }
+            else if (hit(&B_MENU, x, y)) { press(&B_MENU, x, y); open_menu(); }
             else if (hit(&B_EXIT, x, y)) { press(&B_EXIT, x, y); open_dialog(); }
         } else if (g_mode == M_LIST) {
             if (y >= LIST_Y) { g_touchMode = 2; g_listVel = 0; }
         } else if (g_mode == M_MENU) {
-            int i = (int)((y - MENU_Y) / MENU_H);
-            if (y >= MENU_Y && i >= 0 && i < NMENU) { add_lock(x, y); g_menuCur = i; menu_select(i); }
+            if (y >= MENU_Y) { g_touchMode = 3; g_menuFree = true; }
         } else if (g_mode == M_OPT) {
             for (int i = 0; i < NOPT; i++) {
                 if (y < OPT_Y[i] || y >= OPT_Y[i] + OPT_H[i]) continue;
@@ -1565,9 +1621,9 @@ static void handle_input(const PlayerInfo* pi) {
             }
         } else if (g_mode == M_HIST) {
             int k = (int)((y - LIST_Y + g_songScroll) / ROW_H);
-            if (y >= LIST_Y && k >= 0 && k < g_songCount) {
+            if (y >= LIST_Y && k >= 0 && k < g_hviewN) {
                 add_lock(x, y);
-                if (x >= 278) toggle_song_like(k); else g_songCur = k;
+                if (x >= 278) toggle_song_like(g_hview[k]); else g_songCur = k;
             }
         } else if (g_mode == M_SLEEP) {
             for (int i = 0; i < NSLEEP; i++) {
@@ -1581,6 +1637,11 @@ static void handle_input(const PlayerInfo* pi) {
         float m = fabsf((float)(y - g_ty0)) + fabsf((float)(x - g_tx0));
         if (m > g_tmax) g_tmax = m;
         if (g_touchMode == 2) { float d = (float)(g_tyLast - y); g_listScroll += d; g_listVel = d; g_tyLast = y; }
+        if (g_touchMode == 3) {
+            g_menuScroll += (float)(g_tyLast - y); g_tyLast = y;
+            if (g_menuScroll < 0) g_menuScroll = 0;
+            if (g_menuScroll > menu_max_scroll()) g_menuScroll = menu_max_scroll();
+        }
     }
     if (ku & KEY_TOUCH) {
         if (g_touchMode == 2 && g_tmax < 8) {
@@ -1592,6 +1653,10 @@ static void handle_input(const PlayerInfo* pi) {
                 else play_station(g_view[k]);
             }
             g_listVel = 0;
+        }
+        if (g_touchMode == 3 && g_tmax < 8) {
+            int i = (int)((g_ty0 - MENU_Y + g_menuScroll) / MENU_H);
+            if (i >= 0 && i < NMENU) { add_lock(g_tx0, g_ty0); g_menuCur = i; menu_select(i); }
         }
         g_touchMode = 0;
     }
