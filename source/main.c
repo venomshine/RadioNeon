@@ -941,16 +941,16 @@ static float g_helpHit[NHK];   /* when each one was pressed (0 = never) */
 typedef struct { int key; const char* tag; StrId act, act2; int right; float lx, ly; int n; float px[4], py[4]; } Callout;
 /* path: from the button to the end of the underline (lx = the label's outer edge) */
 static const Callout HELP_CO[] = {
-    { HK_L,      "[L]",      S_H_L,      0, 0,   8,  52, 3, { 112, 112,  86 }, {  58,  52,  52 } },
-    { HK_CPAD,   "[O]",      S_H_CPAD,   0, 0,   8,  94, 2, { 112,  86 },      {  94,  94 } },
-    { HK_DPAD,   "[+]",      S_H_DPAD,   0, 0,   8, 142, 2, { 112,  86 },      { 142, 142 } },
-    { HK_Y,      "[Y]",      S_H_Y,      0, 0,   8, 200, 4, { 257, 252, 252,  86 }, { 104, 104, 200, 200 } },
-    { HK_SELECT, "[SELECT]", S_H_SELECT, 0, 0,   8, 226, 3, { 270, 270,  86 }, { 153, 226, 226 } },
-    { HK_R,      "[R]",      S_H_R,      0, 1, 392,  52, 3, { 288, 288, 314 }, {  58,  52,  52 } },
-    { HK_X,      "[X]",      S_H_X,      0, 1, 392,  80, 4, { 282, 302, 302, 314 }, {  91,  91,  80,  80 } },
-    { HK_A,      "[A]",      S_H_A,      0, 1, 392, 108, 4, { 295, 305, 305, 314 }, { 104, 104, 108, 108 } },
-    { HK_B,      "[B]",      S_H_B,      0, 1, 392, 136, 4, { 282, 308, 308, 314 }, { 117, 117, 136, 136 } },
-    { HK_START,  "[START]",  S_H_START, S_H_START2, 1, 392, 164, 4, { 293, 311, 311, 314 }, { 153, 153, 164, 164 } },
+    { HK_L,      "[L]",      S_H_L,      0, 0,   8,  46, 2, { 104,  86 },      {  59,  46 } },
+    { HK_CPAD,   "[O]",      S_H_CPAD,   0, 0,   8,  98, 2, {  99,  86 },      {  98,  98 } },
+    { HK_DPAD,   "[+]",      S_H_DPAD,   0, 0,   8, 133, 2, {  99,  86 },      { 133, 133 } },
+    { HK_R,      "[R]",      S_H_R,      0, 1, 392,  46, 2, { 296, 314 },      {  59,  46 } },
+    { HK_X,      "[X]",      S_H_X,      0, 1, 392,  72, 2, { 289, 314 },      {  95,  72 } },
+    { HK_A,      "[A]",      S_H_A,      0, 1, 392,  98, 2, { 301, 314 },      { 107,  98 } },
+    { HK_B,      "[B]",      S_H_B,      0, 1, 392, 124, 2, { 291, 314 },      { 122, 124 } },
+    { HK_Y,      "[Y]",      S_H_Y,      0, 1, 392, 150, 3, { 273, 273, 314 }, { 116, 131, 150 } },
+    { HK_START,  "[START]",  S_H_START, S_H_START2, 1, 392, 176, 2, { 277, 314 }, { 147, 176 } },
+    { HK_SELECT, "[SELECT]", S_H_SELECT, 0, 1, 392, 210, 2, { 277, 314 },      { 161, 210 } },
 };
 #define NCO (int)(sizeof(HELP_CO) / sizeof(HELP_CO[0]))
 
@@ -978,48 +978,65 @@ static void help_pill(float cx, float cy, int key, u32 c) {
     ch_outline(cx - 7, cy - 3, 14, 6, 2, CUT_TL | CUT_TR | CUT_BL | CUT_BR, f > 0 ? COL_ACC : c, 1);
 }
 
+/* New 3DS XL lower half, traced from a photo of the shell: 216 px wide (0.277 px per photo px) */
 static void help_console(void) {
     u32 body = COL_LINE, det = col_a(COL_TEXT, 0.85f);
-    /* shoulder buttons on the hinge corners */
+    /* body: square top (the hinge), big round corners at the bottom */
+    const float bx = 92, by = 62, bw = 216, bh = 122, rr = 22;
+    u32 bf = col_a(COL_PANEL, 0.9f);
+    C2D_DrawRectSolid(bx, by, 0, bw, bh - rr, bf);
+    C2D_DrawRectSolid(bx + rr, by + bh - rr, 0, bw - 2 * rr, rr, bf);
+    C2D_DrawCircleSolid(bx + rr, by + bh - rr, 0, rr, bf);
+    C2D_DrawCircleSolid(bx + bw - rr, by + bh - rr, 0, rr, bf);
+    C2D_DrawLine(bx, by, COL_TEXT, bx + bw, by, COL_TEXT, 1, 0);
+    C2D_DrawLine(bx, by, COL_TEXT, bx, by + bh - rr, COL_TEXT, 1, 0);
+    C2D_DrawLine(bx + bw, by, COL_TEXT, bx + bw, by + bh - rr, COL_TEXT, 1, 0);
+    C2D_DrawLine(bx + rr, by + bh, COL_TEXT, bx + bw - rr, by + bh, COL_TEXT, 1, 0);
+    for (int i = 0; i < 8; i++) {   /* the two quarter circles */
+        float a0 = i * 1.5708f / 8, a1 = (i + 1) * 1.5708f / 8;
+        C2D_DrawLine(bx + rr - sinf(a0) * rr, by + bh - rr + cosf(a0) * rr, COL_TEXT, bx + rr - sinf(a1) * rr, by + bh - rr + cosf(a1) * rr, COL_TEXT, 1, 0);
+        C2D_DrawLine(bx + bw - rr + sinf(a0) * rr, by + bh - rr + cosf(a0) * rr, COL_TEXT, bx + bw - rr + sinf(a1) * rr, by + bh - rr + cosf(a1) * rr, COL_TEXT, 1, 0);
+    }
+    C2D_DrawRectSolid(114, 69, 0, 171, 1, body);   /* hinge bar */
+    brackets(88, 56, 224, 132, 6, col_a(COL_ACC, 0.6f), 1);
+    /* hinge blocks, with L and R on them */
     float fl = help_flash(HK_L), fr = help_flash(HK_R);
-    if (fl > 0) { C2D_DrawRectSolid(98, 58, 0, 42, 6, col_a(COL_ACC, fl)); }
-    if (fr > 0) { C2D_DrawRectSolid(260, 58, 0, 42, 6, col_a(COL_ACC, fr)); }
-    C2D_DrawLine(92, 70, fl > 0 ? COL_ACC : det, 98, 58, fl > 0 ? COL_ACC : det, 1, 0);
-    C2D_DrawLine(98, 58, fl > 0 ? COL_ACC : det, 140, 58, fl > 0 ? COL_ACC : det, 1, 0);
-    C2D_DrawLine(308, 70, fr > 0 ? COL_ACC : det, 302, 58, fr > 0 ? COL_ACC : det, 1, 0);
-    C2D_DrawLine(302, 58, fr > 0 ? COL_ACC : det, 260, 58, fr > 0 ? COL_ACC : det, 1, 0);
-    C2D_DrawRectSolid(146, 60, 0, 108, 3, col_a(COL_LINE, 0.8f));   /* hinge */
-    /* body */
-    ch_fill(92, 64, 216, 126, 12, CUT_TL | CUT_TR | CUT_BL | CUT_BR, col_a(COL_PANEL, 0.9f));
-    ch_outline(92, 64, 216, 126, 12, CUT_TL | CUT_TR | CUT_BL | CUT_BR, COL_TEXT, 1);
-    brackets(88, 60, 224, 134, 6, col_a(COL_ACC, 0.6f), 1);
-    /* touch screen */
+    ch_fill(92, 59, 23, 17, 3, CUT_TL | CUT_TR | CUT_BL | CUT_BR, fl > 0 ? col_a(COL_ACC, fl) : COL_CARBON);
+    ch_outline(92, 59, 23, 17, 3, CUT_TL | CUT_TR | CUT_BL | CUT_BR, fl > 0 ? COL_ACC : det, 1);
+    ch_fill(285, 59, 23, 17, 3, CUT_TL | CUT_TR | CUT_BL | CUT_BR, fr > 0 ? col_a(COL_ACC, fr) : COL_CARBON);
+    ch_outline(285, 59, 23, 17, 3, CUT_TL | CUT_TR | CUT_BL | CUT_BR, fr > 0 ? COL_ACC : det, 1);
+    mono_draw("L", 104, 64, 1, fl > 0.5f ? COL_BLACK : COL_DIM, 1);
+    mono_draw("R", 297, 64, 1, fr > 0.5f ? COL_BLACK : COL_DIM, 1);
+    /* screen bezel down to the bottom edge, the touch screen, HOME under it */
+    ch_outline(133, 74, 132, 110, 3, CUT_TL | CUT_TR, body, 1);
     float ft = help_flash(HK_TOUCH);
-    ch_fill(152, 76, 96, 72, 4, CUT_TL | CUT_BR, ft > 0 ? col_a(COL_ACC, 0.25f + 0.5f * ft) : COL_CARBON);
-    ch_outline(152, 76, 96, 72, 4, CUT_TL | CUT_BR, ft > 0 ? COL_ACC : body, 1);
-    lbl(T(S_H_TOUCH), 200, 101, 1, COL_ACC, 1);
-    lbl(T(S_H_TOUCH2), 200, 113, 1, COL_DIM, 1);
-    /* left: circle pad and D-pad */
+    ch_fill(139, 80, 120, 90, 2, CUT_TL | CUT_BR, ft > 0 ? col_a(COL_ACC, 0.25f + 0.5f * ft) : COL_CARBON);
+    ch_outline(139, 80, 120, 90, 2, CUT_TL | CUT_BR, ft > 0 ? COL_ACC : det, 1);
+    lbl(T(S_H_TOUCH), 199, 116, 1, COL_ACC, 1);
+    lbl(T(S_H_TOUCH2), 199, 128, 1, COL_DIM, 1);
+    help_pill(199, 177, -1, det);
+    /* left: circle pad in its recess, D-pad */
     float fc = help_flash(HK_CPAD);
-    if (fc > 0) C2D_DrawCircleSolid(124, 94, 0, 11, col_a(COL_ACC, fc));
-    ring(124, 94, 11, fc > 0 ? COL_ACC : det);
-    ring(124, 94, 6, fc > 0 ? COL_ACC : body);
+    ring(114, 98, 14, body);
+    if (fc > 0) C2D_DrawCircleSolid(114, 98, 0, 9, col_a(COL_ACC, fc));
+    ring(114, 98, 9, fc > 0 ? COL_ACC : det);
+    ring(114, 98, 5, fc > 0 ? COL_ACC : body);
     float fd = help_flash(HK_DPAD);
     u32 dc = fd > 0 ? COL_ACC : det;
-    if (fd > 0) { C2D_DrawRectSolid(113, 138, 0, 22, 8, col_a(COL_ACC, fd)); C2D_DrawRectSolid(120, 131, 0, 8, 22, col_a(COL_ACC, fd)); }
-    static const float DX[] = { 120, 128, 128, 135, 135, 128, 128, 120, 120, 113, 113, 120, 120 };
-    static const float DY[] = { 131, 131, 138, 138, 146, 146, 153, 153, 146, 146, 138, 138, 131 };
+    const float cx = 113, cy = 133, a = 13, w = 4.7f;
+    if (fd > 0) { C2D_DrawRectSolid(cx - a, cy - w, 0, a * 2, w * 2, col_a(COL_ACC, fd)); C2D_DrawRectSolid(cx - w, cy - a, 0, w * 2, a * 2, col_a(COL_ACC, fd)); }
+    const float DX[] = { cx - w, cx + w, cx + w, cx + a, cx + a, cx + w, cx + w, cx - w, cx - w, cx - a, cx - a, cx - w, cx - w };
+    const float DY[] = { cy - a, cy - a, cy - w, cy - w, cy + w, cy + w, cy + a, cy + a, cy + w, cy + w, cy - w, cy - w, cy - a };
     for (int i = 0; i < 12; i++) C2D_DrawLine(DX[i], DY[i], dc, DX[i + 1], DY[i + 1], dc, 1, 0);
-    /* right: C-stick, ABXY, SELECT / START (New 3DS layout), HOME */
-    ring(256, 82, 3, body);
-    help_btn(276, 91, 6, "X", HK_X);
-    help_btn(263, 104, 6, "Y", HK_Y);
-    help_btn(289, 104, 6, "A", HK_A);
-    help_btn(276, 117, 6, "B", HK_B);
-    help_pill(270, 150, HK_SELECT, det);
-    help_pill(289, 150, HK_START, det);
-    help_pill(200, 170, -1, body);
-    mono_draw("HOME", 200, 177, 1, col_a(COL_DIM, 0.6f), 1);
+    /* right: C-stick, ABXY, START over SELECT */
+    ring(273, 87, 4.5f, det);
+    help_btn(284.5f, 99.5f, 5.5f, "X", HK_X);
+    help_btn(273, 110, 5.5f, "Y", HK_Y);
+    help_btn(296, 110, 5.5f, "A", HK_A);
+    help_btn(284.5f, 121, 5.5f, "B", HK_B);
+    help_btn(273, 147, 3.2f, NULL, HK_START);
+    help_btn(273, 161, 3.2f, NULL, HK_SELECT);
+    mono_draw("HOME", 199, 188, 1, col_a(COL_DIM, 0.6f), 1);
 }
 
 static void render_top_help(void) {
@@ -1044,7 +1061,7 @@ static void render_top_help(void) {
         /* the line grows from the button: path segments, then the underline under the label */
         float len = 0, seg[5];
         int n = c->n;
-        for (int k = 0; k + 1 < n; k++) { seg[k] = fabsf(c->px[k + 1] - c->px[k]) + fabsf(c->py[k + 1] - c->py[k]); len += seg[k]; }
+        for (int k = 0; k + 1 < n; k++) { seg[k] = hypotf(c->px[k + 1] - c->px[k], c->py[k + 1] - c->py[k]); len += seg[k]; }
         float ul = fabsf(c->lx - c->px[n - 1]);
         seg[n - 1] = ul; len += ul;
         float left = len * ease_out_cubic(p);
