@@ -19,8 +19,11 @@
 #include "app.h"
 
 #define RING_SIZE     (384 * 1024)
-#define PREBUF_BYTES  (40 * 1024)
+#define PREBUF_BYTES  (40 * 1024)   /* minimums; with the bitrate it becomes PREBUF_SEC / REBUF_SEC of audio */
 #define REBUF_BYTES   (24 * 1024)
+#define PREBUF_SEC    3
+#define REBUF_SEC     4             /* after a dropout, wait longer: playing again with little left cuts again */
+#define DEFAULT_KBPS  192           /* stream without icy-br */
 #define NUM_WB        10
 #define WB_FRAMES     4096
 #define CHN           0
@@ -48,6 +51,7 @@ typedef struct Session {
     int  metaLen, metaPos;
     char meta[4096 + 1];
     char ctype[64];
+    volatile int kbps;    /* icy-br, 0 = unknown */
 
     /* wave buffers */
     ndspWaveBuf wb[NUM_WB];
@@ -254,7 +258,7 @@ static size_t hdr_cb(char* b, size_t sz, size_t nm, void* ud) {
     for (char* k = line; *k; k++) *k = tolower((unsigned char)*k);
     if (!strcmp(line, "icy-metaint")) s->metaint = atoi(v);
     else if (!strcmp(line, "content-type")) { snprintf(s->ctype, sizeof(s->ctype), "%s", v); for (char* k = s->ctype; *k; k++) *k = tolower((unsigned char)*k); }
-    else if (!strcmp(line, "icy-br")) { LightLock_Lock(&g_lock); if (s == g_cur) g_info.bitrate = atoi(v); LightLock_Unlock(&g_lock); }
+    else if (!strcmp(line, "icy-br")) { s->kbps = atoi(v); LightLock_Lock(&g_lock); if (s == g_cur) g_info.bitrate = atoi(v); LightLock_Unlock(&g_lock); }
     else if (!strcmp(line, "icy-name")) {
         char utf[128]; to_utf8(v, utf, sizeof(utf));
         LightLock_Lock(&g_lock); if (s == g_cur) snprintf(g_info.icyName, sizeof(g_info.icyName), "%s", utf); LightLock_Unlock(&g_lock);
@@ -516,11 +520,20 @@ static void set_codec_name(Session* s, const char* n) {
     LightLock_Unlock(&g_lock);
 }
 
+/* bytes for `secs` seconds of this stream: 24 KB were 0.6 s of a 320 kbps station, so it kept cutting */
+static size_t buf_bytes(Session* s, int secs, size_t min) {
+    int kbps = s->kbps > 0 && s->kbps <= 512 ? s->kbps : DEFAULT_KBPS;
+    size_t n = (size_t)kbps * 125 * secs;
+    if (n < min) n = min;
+    if (n > RING_SIZE / 2) n = RING_SIZE / 2;
+    return n;
+}
+
 static bool rebuffer_if_needed(Session* s) {
     if (ring_fill(s) > 0) return true;
     if (s->netDone) return false;
     set_state_dec(s, PS_BUFFERING);
-    if (!ring_wait(s, REBUF_BYTES)) return false;
+    if (!ring_wait(s, buf_bytes(s, REBUF_SEC, REBUF_BYTES))) return false;
     set_state(s, PS_PLAYING);
     return true;
 }
@@ -618,7 +631,7 @@ static void dec_thread(void* arg) {
     /* wait for the first data */
     if (ring_wait(s, 1)) {
         set_state_dec(s, PS_BUFFERING);
-        if (ring_wait(s, PREBUF_BYTES)) {
+        if (ring_wait(s, buf_bytes(s, PREBUF_SEC, PREBUF_BYTES))) {
             u8 peek[64]; size_t n;
             LightLock_Lock(&s->lock);
             n = s->rfill < sizeof(peek) ? s->rfill : sizeof(peek);

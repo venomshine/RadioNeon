@@ -3,12 +3,18 @@
  *   GET /h/CODE/api   the history as JSON (a snapshot published by the main thread)
  * Read only: nothing on the console can be changed from the phone. CODE is a random 5-letter code kept in
  * config.ini, so nobody else on the same Wi-Fi stumbles on the page and a bookmark keeps working.
- * Same ideas as Cloud3DS: non-blocking sockets + poll, connections that send nothing for 400 ms are closed
- * (browsers open idle pre-connections), and the listener is reopened when the IP changes. */
+ * Same ideas as Cloud3DS: non-blocking sockets, generous idle limits (browsers open empty pre-connections,
+ * the oldest one is dropped when all slots are taken) and the listener is reopened when the IP changes.
+ * On the real console two details matter that the emulator hides:
+ *   - closesocket() right after send() can cut the answer (the page shows for an instant and then the
+ *     browser gives an error). Like Gemi3DS: shutdown, wait for the phone to close, then close.
+ *   - soc:U is one session shared with the radio stream: a poll() that waits blocks the stream's recv()
+ *     meanwhile. So poll() never waits here; the thread sleeps instead. */
 #include <3ds.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <unistd.h>
@@ -19,12 +25,16 @@
 #include "player.h"
 #include "netlog.h"
 
-#define MAX_CONN   4
-#define REQ_MAX    2048
-#define IDLE_MS    400      /* no request after this: close (pre-connections) */
-#define SEND_MS    4000     /* give up on a client that does not take the answer */
+#define MAX_CONN   6
+#define REQ_MAX    4096
+#define EMPTY_MS   5000     /* pre-connection that never sends a request */
+#define HEAD_MS    15000    /* request started but not finished */
+#define CLOSE_MS   2000     /* answer sent, waiting for the phone to close */
+#define SEND_MS    6000     /* give up on a client that does not take the answer */
+#define TICK_MS    25       /* sleep between polls (poll itself never waits, see above) */
 
-typedef struct { int fd; int len; u64 t0; char req[REQ_MAX]; } Conn;
+enum { C_FREE, C_HEAD, C_CLOSING };
+typedef struct { int st; int fd; int len; u64 t0; char req[REQ_MAX]; } Conn;
 
 static Thread    g_thr;
 static volatile bool g_quit = false;
@@ -57,13 +67,19 @@ static void load_page(void) {
     fclose(f);
 }
 
-/* blocking-ish send on a non-blocking socket: retries until done or SEND_MS */
+static void set_blocking(int fd, bool on) {
+    int fl = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, on ? fl & ~O_NONBLOCK : fl | O_NONBLOCK);
+}
+
+/* send everything on the non-blocking socket, in 8 KB pieces like Gemi3DS, until done or SEND_MS */
 static void send_all(int fd, const char* p, size_t n) {
     u64 t0 = now_ms();
     while (n && now_ms() - t0 < SEND_MS && !g_quit) {
-        int r = send(fd, p, n, 0);
-        if (r > 0) { p += r; n -= r; continue; }
-        svcSleepThread(5 * 1000000ULL);
+        int r = send(fd, p, n > 8192 ? 8192 : n, 0);
+        if (r > 0) { p += r; n -= r; t0 = now_ms(); continue; }
+        if (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK) break;
+        svcSleepThread(10 * 1000000ULL);
     }
 }
 
@@ -128,52 +144,86 @@ static int open_listener(int* port) {
     return -1;
 }
 
+static void conn_close(Conn* c) {
+    if (c->fd >= 0) {
+        set_blocking(c->fd, true);   /* like Gemi3DS: a blocking socket closes gracefully */
+        closesocket(c->fd);
+    }
+    c->fd = -1;
+    c->st = C_FREE;
+}
+
+static void accept_new(int lfd, Conn* conns) {
+    int fd = accept(lfd, NULL, NULL);
+    if (fd < 0) return;
+    Conn* slot = NULL;
+    for (int i = 0; i < MAX_CONN && !slot; i++) if (conns[i].st == C_FREE) slot = &conns[i];
+    if (!slot) {   /* no room: drop the oldest empty pre-connection */
+        for (int i = 0; i < MAX_CONN; i++)
+            if (conns[i].st == C_HEAD && !conns[i].len && (!slot || conns[i].t0 < slot->t0)) slot = &conns[i];
+        if (!slot) { closesocket(fd); return; }
+        conn_close(slot);
+    }
+    set_blocking(fd, false);
+    int bs = 64 * 1024;
+    setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &bs, sizeof(bs));
+    slot->st = C_HEAD; slot->fd = fd; slot->len = 0; slot->t0 = now_ms();
+}
+
+static void on_readable(Conn* c) {
+    if (c->st == C_CLOSING) {   /* the phone's close (0) or leftovers: read and forget */
+        char junk[256];
+        if (recv(c->fd, junk, sizeof(junk), 0) <= 0) conn_close(c);
+        return;
+    }
+    int got = recv(c->fd, c->req + c->len, REQ_MAX - 1 - c->len, 0);
+    if (got <= 0) {
+        if (got < 0 && (errno == EAGAIN || errno == EWOULDBLOCK)) return;
+        conn_close(c);
+        return;
+    }
+    c->len += got; c->req[c->len] = 0; c->t0 = now_ms();
+    if (!strstr(c->req, "\r\n\r\n") && c->len < REQ_MAX - 1) return;
+    handle(c);
+    shutdown(c->fd, SHUT_WR);   /* everything sent: let it reach the phone before closing */
+    c->st = C_CLOSING; c->t0 = now_ms();
+}
+
 static void serve(int lfd, u32 ip) {
     static Conn conns[MAX_CONN];
-    for (int i = 0; i < MAX_CONN; i++) conns[i].fd = -1;
+    for (int i = 0; i < MAX_CONN; i++) { conns[i].st = C_FREE; conns[i].fd = -1; }
     u64 lastIp = now_ms();
     while (!g_quit) {
         struct pollfd pf[MAX_CONN + 1];
         int idx[MAX_CONN + 1], n = 0;
-        bool room = false;
         for (int i = 0; i < MAX_CONN; i++) {
-            if (conns[i].fd < 0) { room = true; continue; }
+            if (conns[i].st == C_FREE) continue;
             pf[n].fd = conns[i].fd; pf[n].events = POLLIN; pf[n].revents = 0; idx[n++] = i;
         }
-        if (room) { pf[n].fd = lfd; pf[n].events = POLLIN; pf[n].revents = 0; idx[n++] = -1; }
-        int r = poll(pf, n, 50);
+        pf[n].fd = lfd; pf[n].events = POLLIN; pf[n].revents = 0; idx[n++] = -1;
+        int r = poll(pf, n, 0);
         for (int k = 0; r > 0 && k < n; k++) {
             if (!pf[k].revents) continue;
-            if (idx[k] < 0) {
-                int fd = accept(lfd, NULL, NULL);
-                if (fd < 0) continue;
-                for (int i = 0; i < MAX_CONN; i++) if (conns[i].fd < 0) {
-                    fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
-                    conns[i].fd = fd; conns[i].len = 0; conns[i].t0 = now_ms();
-                    fd = -1;
-                    break;
-                }
-                if (fd >= 0) closesocket(fd);
-                continue;
-            }
+            if (idx[k] < 0) { accept_new(lfd, conns); continue; }
             Conn* c = &conns[idx[k]];
-            int got = recv(c->fd, c->req + c->len, REQ_MAX - 1 - c->len, 0);
-            bool done = got <= 0;
-            if (got > 0) {
-                c->len += got; c->req[c->len] = 0;
-                if (strstr(c->req, "\r\n\r\n") || c->len >= REQ_MAX - 1) { handle(c); done = true; }
-            }
-            if (done) { closesocket(c->fd); c->fd = -1; }
+            if (c->st == C_FREE || c->fd != pf[k].fd) continue;
+            if (pf[k].revents & (POLLERR | POLLNVAL)) conn_close(c);
+            else on_readable(c);
         }
         u64 t = now_ms();
-        for (int i = 0; i < MAX_CONN; i++)
-            if (conns[i].fd >= 0 && t - conns[i].t0 > IDLE_MS) { closesocket(conns[i].fd); conns[i].fd = -1; }
+        for (int i = 0; i < MAX_CONN; i++) {
+            Conn* c = &conns[i];
+            if (c->st == C_FREE) continue;
+            u64 lim = c->st == C_CLOSING ? CLOSE_MS : c->len ? HEAD_MS : EMPTY_MS;
+            if (t - c->t0 > lim) conn_close(c);
+        }
         if (t - lastIp > 1000) {   /* Wi-Fi changed (or lost): reopen on the new address */
             lastIp = t;
             if ((u32)gethostid() != ip) break;
         }
+        if (r <= 0) svcSleepThread(TICK_MS * 1000000ULL);
     }
-    for (int i = 0; i < MAX_CONN; i++) if (conns[i].fd >= 0) closesocket(conns[i].fd);
+    for (int i = 0; i < MAX_CONN; i++) if (conns[i].st != C_FREE) conn_close(&conns[i]);
 }
 
 static void web_thread(void* arg) {
