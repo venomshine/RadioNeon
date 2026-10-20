@@ -60,6 +60,7 @@ static void read_file(const char* path) {
         else if (!strcmp(line, "autoplay")) g_cfg.autoplay = parse_bool(v);
         else if (!strcmp(line, "lang")) g_cfg.lang = atoi(v);
         else if (!strcmp(line, "shuffle")) g_cfg.shuffle = parse_bool(v);
+        else if (!strcmp(line, "link")) snprintf(g_cfg.link, sizeof(g_cfg.link), "%.5s", v);
     }
     fclose(f);
 }
@@ -85,8 +86,8 @@ void config_save(void) {
     FILE* f = fopen(CFG_PATH ".tmp", "wb");
     if (!f) return;
     fprintf(f, "# " APP_NAME " " APP_VERSION " config\n");
-    fprintf(f, "station=%d\naccent=%d\nlid_play=%d\nscanlines=%d\nglitch=%d\nautoplay=%d\nlang=%d\nshuffle=%d\n",
-            g_cfg.station, g_cfg.accent, g_cfg.lidPlay, g_cfg.scanlines, g_cfg.glitch, g_cfg.autoplay, g_cfg.lang, g_cfg.shuffle);
+    fprintf(f, "station=%d\naccent=%d\nlid_play=%d\nscanlines=%d\nglitch=%d\nautoplay=%d\nlang=%d\nshuffle=%d\nlink=%s\n",
+            g_cfg.station, g_cfg.accent, g_cfg.lidPlay, g_cfg.scanlines, g_cfg.glitch, g_cfg.autoplay, g_cfg.lang, g_cfg.shuffle, g_cfg.link);
     commit_file(f, CFG_PATH ".tmp", CFG_PATH);
 }
 

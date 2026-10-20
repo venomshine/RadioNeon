@@ -32,7 +32,7 @@ Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, ci
 - **HTTPS verificado** con los certificados raíz de Mozilla incluidos en la app.
 - **Nunca se rinde:** si se corta la emisora o el Wi-Fi, vuelve a conectar sola. Mientras tanto te dice el motivo real (sin Wi-Fi, el servidor no responde, HTTP 404…) y cuánto falta para el siguiente intento.
 - **Favoritas** (Y o tocando la estrella) y **aleatorio** (L o su botón): NEXT salta a una emisora al azar sin repetir las últimas.
-- **Historial de canciones** (↓ o el botón del centro): se apuntan solas las que suenan al menos 30 s. **B** guarda con ♥ la que está sonando, con un bip-bip. Cada canción tiene un QR para buscarla en Spotify desde el móvil.
+- **Historial de canciones** (↓ o el botón del centro): se apuntan solas las que suenan al menos 30 s. **B** guarda con ♥ la que está sonando, con un bip-bip. Desde el historial, un QR abre en el móvil una página con todas las canciones y botones de Spotify, YouTube Music y Copiar (misma Wi-Fi o el hotspot del móvil; la página solo se puede ver, no toca nada de la consola). Con A, el QR pasa a ser la búsqueda en Spotify de la canción elegida.
 - **Aviso de batería baja**, sin molestar: un bip suave cada 5 % desde el 40 %, dos bips cada 2 % desde el 20 %, al 10 % la radio se pausa y te avisa, y al 3 % se bloquea con un cartel fijo hasta que conectes el cargador. Con el cargador puesto no suena nada.
 - **Temporizador de apagado** (R o su botón): 15, 30, 60, 90 minutos o los que quieras; la radio baja el volumen poco a poco y se para sola. Con la tapa cerrada, la consola se va a dormir.
 - **Osciloscopio y espectro** del audio que suena, con detector de ritmo, y **barra de volumen** que sigue al deslizador de la consola.
@@ -68,7 +68,7 @@ Necesitas una 3DS / 2DS / New 3DS con CFW (Luma3DS) y Wi-Fi configurado.
 | Menú | **↑ / ↓** · **A** abrir · **B** o **X** cerrar |
 | Opciones | **↑ / ↓** · **← / →** o **A** cambiar · **B** volver |
 | Temporizador | **↑ / ↓** · **A** elegir · **B** volver |
-| Historial | **↑ / ↓** moverse · **← / →** pasar página · **Y** guardar / quitar ♥ · **B** volver |
+| Historial | **↑ / ↓** moverse · **← / →** pasar página · **A** QR de Spotify de la canción · **Y** guardar / quitar ♥ · **B** volver |
 | Acerca de | **B** volver |
 
 Todo se puede hacer también con la pantalla táctil. El volumen se controla con el deslizador de la consola.
@@ -115,7 +115,7 @@ Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city
 - **Verified HTTPS** with the Mozilla root certificates bundled in the app.
 - **Never gives up:** if the stream or the Wi-Fi drops, it reconnects by itself. Meanwhile it shows the real reason (no Wi-Fi, server not responding, HTTP 404…) and a countdown to the next try.
 - **Favourites** (Y or tap the star) and **shuffle** (L or its button): NEXT jumps to a random station without repeating the last ones.
-- **Song history** (↓ or the middle button): songs that play for at least 30 s are added by themselves. **B** saves the one playing with a ♥ and a double beep. Every song has a QR code to look it up on Spotify from your phone.
+- **Song history** (↓ or the middle button): songs that play for at least 30 s are added by themselves. **B** saves the one playing with a ♥ and a double beep. From the history, a QR code opens a page on your phone with every song and Spotify, YouTube Music and Copy buttons (same Wi-Fi or the phone's hotspot; the page is read only). With A, the QR code becomes the Spotify search for the selected song.
 - **Low battery warning**, never intrusive: a soft beep every 5 % from 40 %, two beeps every 2 % from 20 %, at 10 % the radio pauses and tells you, and at 3 % it locks behind a fixed notice until you plug in the charger. Nothing while charging.
 - **Sleep timer** (R or its button): 15, 30, 60, 90 minutes or any time you like; the radio fades out and stops by itself. With the lid closed, the console then goes to sleep.
 - **Oscilloscope and spectrum** of what is playing, with a beat detector, and a **volume bar** that follows the console's slider.
@@ -151,7 +151,7 @@ You need a 3DS / 2DS / New 3DS with CFW (Luma3DS) and Wi-Fi set up.
 | Menu | **↑ / ↓** · **A** open · **B** or **X** close |
 | Options | **↑ / ↓** · **← / →** or **A** change · **B** back |
 | Sleep timer | **↑ / ↓** · **A** choose · **B** back |
-| Song history | **↑ / ↓** move · **← / →** page · **Y** save / unsave ♥ · **B** back |
+| Song history | **↑ / ↓** move · **← / →** page · **A** Spotify QR of the song · **Y** save / unsave ♥ · **B** back |
 | About | **B** back |
 
 Everything also works with the touch screen. Volume is the console's slider.

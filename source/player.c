@@ -662,6 +662,8 @@ bool player_init(void) {
     return true;
 }
 
+bool player_soc_ok(void) { return g_socOk; }
+
 void player_stop(void) {
     LightLock_Lock(&g_lock);
     Session* s = g_cur;

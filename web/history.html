@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08080a">
+<title>Radio Neon</title>
+<style>
+:root { --bg:#08080a; --panel:#0e0e11; --carbon:#141418; --line:#34343c; --dim:#6e6e76; --text:#e2e2dc; --acc:#fcee0a; --red:#ff003c; }
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font:15px/1.35 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+       background-image:radial-gradient(var(--line) 1px, transparent 1px); background-size:12px 12px; min-height:100vh; }
+.mono { font-family:ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace; letter-spacing:.08em; text-transform:uppercase; }
+header { position:sticky; top:0; z-index:2; background:var(--bg); padding:14px 16px 10px; border-bottom:1px solid var(--line); }
+header::after { content:""; position:absolute; left:16px; bottom:-1px; width:36px; height:1px; background:var(--acc); }
+.brand { display:flex; align-items:baseline; gap:10px; }
+.brand b { color:var(--acc); font-size:15px; }
+.brand span { color:var(--dim); font-size:11px; }
+.status { margin-top:6px; display:flex; align-items:center; gap:7px; font-size:11px; color:var(--dim); }
+.dot { width:8px; height:8px; background:var(--acc); clip-path:polygon(25% 0,100% 0,100% 75%,75% 100%,0 100%,0 25%); animation:pulse 1.6s infinite; }
+.off .dot { background:var(--red); animation:none; }
+@keyframes pulse { 50% { opacity:.35; } }
+main { padding:12px 16px 40px; max-width:640px; margin:0 auto; }
+.cut { clip-path:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px); }
+.now { background:var(--acc); color:#000; padding:12px 14px; margin-bottom:14px; }
+.now .lbl { font-size:11px; font-weight:700; }
+.now .t { font-size:18px; font-weight:700; margin:4px 0 2px; word-break:break-word; }
+.now .s { font-size:11px; opacity:.75; }
+.now .btns a, .now .btns button { background:#000; color:var(--acc); border-color:#000; }
+.tabs { display:flex; gap:8px; margin:4px 0 10px; }
+.tab { flex:1; background:var(--panel); color:var(--dim); border:1px solid var(--line); padding:8px; font-size:12px; text-align:center; cursor:pointer; }
+.tab.on { color:var(--acc); border-color:var(--acc); background:var(--carbon); }
+.item { background:var(--panel); border:1px solid var(--line); padding:10px 12px 12px; margin-bottom:10px; position:relative; }
+.item.liked { border-color:color-mix(in srgb, var(--acc) 55%, var(--line)); }
+.meta { display:flex; gap:8px; font-size:11px; color:var(--dim); }
+.meta .h { color:var(--acc); }
+.item .t { font-size:16px; margin:3px 26px 8px 0; word-break:break-word; }
+.heart { position:absolute; right:12px; top:12px; width:18px; height:16px; color:var(--acc); }
+.btns { display:flex; gap:6px; flex-wrap:wrap; }
+.btns a, .btns button { flex:1; min-width:84px; display:inline-flex; align-items:center; justify-content:center; gap:6px; height:34px;
+       background:var(--carbon); color:var(--text); border:1px solid var(--line); font:600 12px/1 ui-monospace, Menlo, Consolas, monospace;
+       letter-spacing:.06em; text-transform:uppercase; text-decoration:none; cursor:pointer; }
+.btns a:active, .btns button:active { background:var(--acc); color:#000; }
+.btns svg { width:14px; height:14px; flex:none; }
+.empty { color:var(--dim); text-align:center; padding:40px 0; font-size:13px; }
+.toast { position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(80px); background:var(--acc); color:#000; padding:10px 16px;
+         font:700 12px ui-monospace, Menlo, monospace; letter-spacing:.08em; transition:transform .25s; }
+.toast.show { transform:translateX(-50%) translateY(0); }
+footer { color:var(--dim); font-size:10px; text-align:center; margin-top:18px; }
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><b class="mono">Radio//Neon</b><span class="mono">ラジオネオン</span></div>
+  <div class="status mono" id="stat"><i class="dot"></i><span id="st"></span></div>
+</header>
+<main>
+  <section id="now" class="now cut"></section>
+  <div class="tabs mono"><div class="tab on" data-f="all" id="tAll"></div><div class="tab" data-f="like" id="tLike"></div></div>
+  <section id="list"></section>
+  <footer class="mono">//VENOMSHiNE</footer>
+</main>
+<div class="toast cut" id="toast"></div>
+<textarea id="cp" style="position:fixed;left:-999px;top:0" readonly></textarea>
+<script>
+/* Radio Neon - song history on the phone. Served by the console; asks it for /api every 2 s.
+   Read only. The last list is kept in localStorage so it stays readable if the console goes away. */
+const L = {
+  es: { on:'Conectado a la 3DS', off:'Sin conexión con la 3DS', all:'Todo', like:'♥ Guardadas', now:'Ahora suena', idle:'Sin emisora',
+        saved:'♥ Guardada', save:'Pulsa B en la 3DS para guardarla', copy:'Copiar', copied:'Copiado', empty:'Aún no hay canciones', emptyLike:'Aún no hay canciones guardadas' },
+  en: { on:'Connected to the 3DS', off:'Not connected to the 3DS', all:'All', like:'♥ Saved', now:'Now playing', idle:'No station',
+        saved:'♥ Saved', save:'Press B on the 3DS to save it', copy:'Copy', copied:'Copied', empty:'No songs yet', emptyLike:'No saved songs yet' },
+  ja: { on:'3DSに接続中', off:'3DSに接続できません', all:'すべて', like:'♥ 保存済み', now:'再生中', idle:'局なし',
+        saved:'♥ 保存済み', save:'3DSのBで保存', copy:'コピー', copied:'コピーしました', empty:'まだ曲がありません', emptyLike:'保存した曲はまだありません' }
+};
+const lang = (navigator.language || 'es').slice(0, 2);
+const T = L[lang] || L.en;
+document.documentElement.lang = L[lang] ? lang : 'en';
+const I = {
+  play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+  yt: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 3.5a6.5 6.5 0 110 13 6.5 6.5 0 010-13zm0 1a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM10 9l5 3-5 3V9z"/></svg>',
+  cp: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="8" width="12" height="12"/><path d="M4 16V4h12"/></svg>',
+  heart: '<svg viewBox="0 0 24 22" fill="currentColor"><path d="M12 21.5L10.3 20C4.2 14.4 0 10.6 0 6A6 6 0 016 0c2.4 0 4.6 1.1 6 2.9A8 8 0 0118 0a6 6 0 016 6c0 4.6-4.2 8.4-10.3 14L12 21.5z"/></svg>'
+};
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const query = t => encodeURIComponent(t.replace(/ - /g, ' '));
+let data = { now:null, items:[] }, filter = 'all', last = '';
+try { const c = localStorage.getItem('rn_hist'); if (c) data = JSON.parse(c); } catch (e) {}
+$('tAll').textContent = T.all; $('tLike').textContent = T.like; $('toast').textContent = T.copied;
+
+function btns(t) {
+  return `<div class="btns">
+    <a href="https://open.spotify.com/search/${query(t)}" target="_blank" rel="noopener">${I.play}Spotify</a>
+    <a href="https://music.youtube.com/search?q=${query(t)}" target="_blank" rel="noopener">${I.yt}YT Music</a>
+    <button data-copy="${esc(t)}">${I.cp}${esc(T.copy)}</button></div>`;
+}
+function render() {
+  const n = data.now;
+  $('now').innerHTML = n
+    ? `<div class="lbl mono">▶ ${esc(T.now)} · ${esc(n.st)}</div><div class="t">${esc(n.t)}</div><div class="s mono">${esc(n.like ? T.saved : T.save)}</div>${btns(n.t)}`
+    : `<div class="lbl mono">${esc(T.idle)}</div>`;
+  const items = (data.items || []).filter(i => filter == 'all' || i.like);
+  $('list').innerHTML = items.length ? items.map(i => `
+    <article class="item cut ${i.like ? 'liked' : ''}">
+      <div class="meta mono"><span class="h">${esc(i.hm)}</span><span>${esc(i.st)}</span></div>
+      <div class="t">${esc(i.t)}</div>${i.like ? `<span class="heart">${I.heart}</span>` : ''}
+      ${btns(i.t)}
+    </article>`).join('') : `<div class="empty mono">${esc(filter == 'all' ? T.empty : T.emptyLike)}</div>`;
+}
+function status(ok) {
+  $('stat').classList.toggle('off', !ok);
+  $('st').textContent = ok ? T.on : T.off;
+}
+async function poll() {
+  try {
+    const r = await fetch(location.pathname.replace(/\/$/, '') + '/api', { cache:'no-store' });
+    const txt = await r.text();
+    status(r.ok);
+    if (r.ok && txt != last) {
+      last = txt; data = JSON.parse(txt); render();
+      try { localStorage.setItem('rn_hist', txt); } catch (e) {}
+    }
+  } catch (e) { status(false); }
+  setTimeout(poll, 2000);
+}
+document.addEventListener('click', e => {
+  const tab = e.target.closest('.tab');
+  if (tab) { filter = tab.dataset.f; document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t == tab)); render(); return; }
+  const b = e.target.closest('[data-copy]');
+  if (!b) return;
+  const ta = $('cp'); ta.value = b.dataset.copy; ta.select(); document.execCommand('copy');
+  const t = $('toast'); t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1400);
+});
+render(); status(true); poll();
+</script>
+</body>
+</html>

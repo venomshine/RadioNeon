@@ -15,6 +15,7 @@ typedef struct {
 
 extern HistEntry g_songs[HIST_MAX];
 extern int g_songCount;
+extern int g_songVer;   /* changes every time the list changes */
 
 void hist_load(void);
 /* adds a song at the top (or moves it there if it is already the newest); returns its index (0) */

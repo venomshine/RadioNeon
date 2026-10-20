@@ -37,6 +37,7 @@ void player_set_ndsp(bool ok); /* tell the engine whether ndsp is running */
 void player_exit(void);
 void player_play(const char* url);
 void player_stop(void);
+bool player_soc_ok(void);      /* socInit done (the network stack can be used) */
 void player_set_volume(float v);
 /* 0 = song saved (two rising pips), 1 = removed (one low pip),
    2 / 3 / 4 = battery 40 % (one soft pip) / 20 % (two pips) / 10 % (three falling pips) */

@@ -26,6 +26,7 @@
 #include "app.h"
 #include "qrcodegen.h"
 #include "history.h"
+#include "web.h"
 
 #define TOP_W 400
 #define BOT_W 320
@@ -1118,6 +1119,18 @@ static void spotify_url(const char* title, char* out, size_t n) {
     out[k] = 0;
 }
 
+static bool g_histSongQR = false;   /* top screen of the history: false = phone page, true = Spotify of the song */
+
+/* QR centred in the area under the header, a bit bigger than 150 px; returns where the text starts */
+static float qr_block(const uint8_t* qr) {
+    int n = qrcodegen_getSize(qr), px = 156 / n;
+    if (px < 1) px = 1;
+    float qs = n * px, qx = 46, qy = 129 - qs / 2;
+    draw_qr(qr, qx, qy, px);
+    brackets(qx - 10, qy - 10, qs + 20, qs + 20, 7, col_a(COL_ACC, 0.6f), 1);
+    return qx + qs + 30;
+}
+
 static void render_top_hist(void) {
     C2D_DrawRectSolid(0, 0, 0, TOP_W, SCR_H, COL_BG);
     dot_matrix(TOP_W);
@@ -1128,27 +1141,16 @@ static void render_top_hist(void) {
     mono_draw("HISTORY // LINK", 88, 10, 1, COL_DIM, 0);
     C2D_DrawRectSolid(14, 24, 0, 372, 1, COL_LINE);
     C2D_DrawRectSolid(14, 24, 0, 30, 1, COL_ACC);
-    if (g_songCount) {
+    static uint8_t qr[qrcodegen_BUFFER_LEN_MAX], tmp[qrcodegen_BUFFER_LEN_MAX];
+    static char done[600] = "";   /* what the QR holds now: encoded once */
+    static bool ok = false;
+    float ty = 129 - 46;
+    if (g_histSongQR && g_songCount) {
         const HistEntry* e = &g_songs[g_songCur];
-        static uint8_t qr[qrcodegen_BUFFER_LEN_MAX], tmp[qrcodegen_BUFFER_LEN_MAX];
-        static char done[sizeof(e->title)] = "";
-        static bool ok = false;
-        if (strcmp(done, e->title)) {   /* encode once per song */
-            char url[600];
-            spotify_url(e->title, url, sizeof(url));
-            ok = qrcodegen_encodeText(url, tmp, qr, qrcodegen_Ecc_LOW, 3, 25, qrcodegen_Mask_AUTO, true);
-            snprintf(done, sizeof(done), "%s", e->title);
-        }
-        float tx = 46;
-        if (ok) {
-            int n = qrcodegen_getSize(qr), px = 156 / n;
-            if (px < 1) px = 1;
-            float qs = n * px, qx = 46, qy = 129 - qs / 2;   /* centred in the area under the header */
-            draw_qr(qr, qx, qy, px);
-            brackets(qx - 10, qy - 10, qs + 20, qs + 20, 7, col_a(COL_ACC, 0.6f), 1);
-            tx = qx + qs + 30;
-        }
-        float ty = 129 - 46, tw = 376 - tx;
+        char url[600];
+        spotify_url(e->title, url, sizeof(url));
+        if (strcmp(done, url)) { ok = qrcodegen_encodeText(url, tmp, qr, qrcodegen_Ecc_LOW, 3, 25, qrcodegen_Mask_AUTO, true); snprintf(done, sizeof(done), "%s", url); }
+        float tx = ok ? qr_block(qr) : 46, tw = 376 - tx;
         mono_draw("SPOTIFY", tx, ty, 2, COL_ACC, 0);
         char a[160], b[160];
         const char* dash = strstr(e->title, " - ");
@@ -1162,8 +1164,22 @@ static void render_top_hist(void) {
         text_draw(T(S_HIST_SCAN), tx, ty + 82, 0.5f, COL_TEXT, 0);
         text_draw(T(S_HIST_KEYS), tx, ty + 102, 0.42f, COL_ACC, 0);
     } else {
-        icon_history(200, 112, col_a(COL_ACC, 0.5f));
-        lbl(T(S_HIST_EMPTY1), 200, 134, 1, COL_DIM, 1);
+        char url[96];
+        if (web_url(url, sizeof(url))) {
+            if (strcmp(done, url)) { ok = qrcodegen_encodeText(url, tmp, qr, qrcodegen_Ecc_LOW, 3, 25, qrcodegen_Mask_AUTO, true); snprintf(done, sizeof(done), "%s", url); }
+            float tx = ok ? qr_block(qr) : 46;
+            mono_draw("PHONE LINK", tx, ty, 2, COL_ACC, 0);
+            text_draw(T(S_LINK_SCAN1), tx, ty + 24, 0.55f, COL_TEXT, 0);
+            text_draw(T(S_LINK_SCAN2), tx, ty + 42, 0.55f, COL_TEXT, 0);
+            mono_draw(url + 7, tx, ty + 68, 1, COL_DIM, 0);   /* without "http://" */
+            text_draw(T(S_LINK_NET), tx, ty + 78, 0.42f, COL_DIM, 0);
+            if (g_songCount) text_draw(T(S_LINK_A), tx, ty + 98, 0.42f, COL_ACC, 0);
+        } else {   /* no Wi-Fi: no address to give */
+            mono_draw("PHONE LINK", 200, ty + 10, 2, COL_DIM, 1);
+            lbl(T(S_LINK_NOWIFI), 200, ty + 40, 2, COL_TEXT, 1);
+            text_draw(T(S_LINK_NOWIFI2), 200, ty + 62, 0.5f, COL_DIM, 1);
+            if (g_songCount) text_draw(T(S_LINK_A), 200, ty + 98, 0.42f, COL_ACC, 1);
+        }
     }
     scanlines(TOP_W);
 }
@@ -1357,7 +1373,7 @@ static void save_now_song(const PlayerInfo* pi) {
 }
 
 static void open_history(void) {
-    g_songCur = 0; g_songScroll = 0;
+    g_songCur = 0; g_songScroll = 0; g_histSongQR = false;
     set_mode(M_HIST);
 }
 
@@ -1472,7 +1488,8 @@ static void handle_input(const PlayerInfo* pi) {
             if (horiz) opt_change(g_optCur, horiz);
             break;
         case M_HIST:
-            if (kd & KEY_B) go_back();
+            if ((kd & KEY_A) && g_songCount) g_histSongQR = true;   /* top: Spotify of the song */
+            if (kd & KEY_B) { if (g_histSongQR) g_histSongQR = false; else go_back(); }
             if (kd & KEY_Y) toggle_song_like(g_songCur);
             if (vert && g_songCount) g_songCur = (g_songCur + vert + g_songCount) % g_songCount;
             if (horiz && g_songCount) {
@@ -1750,6 +1767,46 @@ static void battery_warn(void) {
     }
 }
 
+/* JSON for the phone page (/api), rebuilt only when the list or the song on air changes */
+static void json_str(char* out, size_t n, size_t* k, const char* s) {
+    if (*k + 2 < n) out[(*k)++] = '"';
+    for (const unsigned char* p = (const unsigned char*)s; *p && *k + 8 < n; p++) {
+        if (*p == '"' || *p == '\\') { out[(*k)++] = '\\'; out[(*k)++] = *p; }
+        else if (*p < 0x20) *k += snprintf(out + *k, n - *k, "\\u%04x", *p);
+        else out[(*k)++] = *p;
+    }
+    if (*k + 1 < n) out[(*k)++] = '"';
+    out[*k] = 0;
+}
+
+static void web_snapshot(const PlayerInfo* pi) {
+    static int ver = -1, liked = -1;
+    static char title[sizeof(pi->title)] = "x";
+    static char* buf = NULL;
+    enum { CAP = 96 * 1024 };
+    int k = now_song(pi), lk = k >= 0 && g_songs[k].liked;
+    const char* t = pi->state == PS_PLAYING ? pi->title : "";
+    if (ver == g_songVer && liked == lk && !strcmp(title, t)) return;
+    ver = g_songVer; liked = lk; snprintf(title, sizeof(title), "%s", t);
+    if (!buf && !(buf = malloc(CAP))) return;
+    size_t n = 0;
+    n += snprintf(buf + n, CAP - n, "{\"now\":");
+    if (t[0] && g_playing >= 0) {
+        n += snprintf(buf + n, CAP - n, "{\"t\":"); json_str(buf, CAP, &n, t);
+        n += snprintf(buf + n, CAP - n, ",\"st\":"); json_str(buf, CAP, &n, g_stations[g_playing].name);
+        n += snprintf(buf + n, CAP - n, ",\"like\":%s}", lk ? "true" : "false");
+    } else n += snprintf(buf + n, CAP - n, "null");
+    n += snprintf(buf + n, CAP - n, ",\"items\":[");
+    for (int i = 0; i < g_songCount && n + 600 < CAP; i++) {
+        struct tm* tm = localtime(&g_songs[i].when);
+        n += snprintf(buf + n, CAP - n, "%s{\"t\":", i ? "," : ""); json_str(buf, CAP, &n, g_songs[i].title);
+        n += snprintf(buf + n, CAP - n, ",\"st\":"); json_str(buf, CAP, &n, g_songs[i].station);
+        n += snprintf(buf + n, CAP - n, ",\"hm\":\"%02d:%02d\",\"like\":%s}", tm ? tm->tm_hour : 0, tm ? tm->tm_min : 0, g_songs[i].liked ? "true" : "false");
+    }
+    n += snprintf(buf + n, CAP - n, "]}");
+    web_publish(buf, n);
+}
+
 /* --------------------------------------------------------------- main */
 int main(int argc, char** argv) {
     osSetSpeedupEnable(true);
@@ -1781,6 +1838,13 @@ int main(int argc, char** argv) {
     if (g_cfg.station >= 0 && g_cfg.station < g_stationCount) g_sel = g_cfg.station;
     build_view();
     player_init();
+    if (strlen(g_cfg.link) != 5) {   /* phone page code: made once, then kept so a bookmark keeps working */
+        static const char AB[] = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";   /* no 0/O, 1/I */
+        for (int i = 0; i < 5; i++) g_cfg.link[i] = AB[rand() % (sizeof(AB) - 1)];
+        g_cfg.link[5] = 0;
+        config_save();
+    }
+    web_start(g_cfg.link);
     /* audio bring-up: sdmc:/3ds/dspfirm.cdc -> embedded OpenDSP -> warning */
     g_fw = dspfw_init_audio(dspfw_exists() ? NULL : boot_cb, g_fwDetail, sizeof(g_fwDetail));
     player_set_ndsp(g_fw != FW_NONE);
@@ -1801,6 +1865,7 @@ int main(int argc, char** argv) {
         handle_input(&pi);
         player_get_info(&pi);
         hist_track(&pi);
+        web_snapshot(&pi);
 
         float target = (pi.state == PS_STOPPED || pi.state == PS_ERROR) ? 0 : 1;
         g_morph += (target - g_morph) * 0.2f;
@@ -1833,6 +1898,7 @@ int main(int argc, char** argv) {
     aptSetSleepAllowed(true);
     if (g_lcdOff) backlights(true);
     aptUnhook(&g_aptCookie);
+    web_stop();
     player_exit();
     C2D_Fini();
     C3D_Fini();

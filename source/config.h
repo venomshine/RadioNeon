@@ -15,6 +15,7 @@ typedef struct {
     int  lang;         /* LANGSEL_*: 0 system, 1 es, 2 en, 3 ja */
     int  station;      /* last station */
     bool shuffle;      /* NEXT jumps to a random station */
+    char link[8];      /* code in the phone page address (/h/CODE), kept so a bookmark keeps working */
 } Config;
 
 extern Config g_cfg;

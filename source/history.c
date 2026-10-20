@@ -8,12 +8,14 @@
 
 HistEntry g_songs[HIST_MAX];
 int g_songCount = 0;
+int g_songVer = 0;
 
 /* tabs and newlines would break the file format */
 static void clean(char* s) { for (; *s; s++) if (*s == '\t' || *s == '\r' || *s == '\n') *s = ' '; }
 
 /* same safe write as config.ini: .tmp first, then replace */
 static void hist_save(void) {
+    g_songVer++;
     FILE* f = fopen(HIST_PATH ".tmp", "wb");
     if (!f) return;
     for (int i = g_songCount - 1; i >= 0; i--)   /* oldest first, like a log */

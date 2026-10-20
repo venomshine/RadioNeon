@@ -25,7 +25,7 @@
 - **Aleatorio** en la pantalla principal (botón o L): NEXT salta a una emisora al azar.
 - **Temporizador de apagado** (botón o R): 15, 30, 60, 90 minutos o personalizado, con fundido de 10 s al final.
 - SELECT abre la lista de emisoras.
-- **Historial de canciones** (↓ o el botón del centro), con QR para buscar cada una en Spotify. **B** guarda con ♥ la que suena, con un bip-bip al estilo del sonido del HOME.
+- **Historial de canciones** (↓ o el botón del centro), con una página para el móvil (QR, misma Wi-Fi o hotspot) con botones de Spotify, YouTube Music y Copiar, y QR de Spotify de cada canción. **B** guarda con ♥ la que suena, con un bip-bip al estilo del sonido del HOME.
 - Lista de emisoras renovada: más radios de Japón (FMかほく, WREP, Gotanno FM, Retro PC Game Music…), dos de eurobeat, FLY FM de city pop, J-Rock, Visual Kei y VocaloPlus!. Si tu `stations.txt` era la lista de serie sin cambios, se actualiza sola y la anterior queda en `stations.old.txt`.
 - Género de cada emisora en la lista y en favoritas (`Nombre | URL | Género` en `stations.txt`).
 - Aviso de batería baja: bips cortos desde el 40 % y el 20 %, pausa con aviso al 10 %, y al 3 % la radio queda bloqueada con un cartel fijo hasta conectar el cargador.
