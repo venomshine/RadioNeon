@@ -36,20 +36,21 @@ static const char* DEFAULT_LIST =
 "WREP ヒップホップ (AAC) | http://c13.radioboss.fm:8200/stream | HIP-HOP\n"
 "J-Rock ロック | https://j-rock.stream.laut.fm/j-rock | J-ROCK\n"
 "Visual Kei ヴィジュアル系 (AAC) | http://79.120.12.130:8000/visualkei | VISUAL KEI\n"
-"SOUND UP STATION NFRS | https://stream2.rcast.net/70945 | INDIE\n"
+"Justplay 渋谷 | https://justplay.stream.laut.fm/justplay | J-POP\n"
 "Radio Hayama 葉山 | https://server10.reliastream.com/proxy/radiohayama | INDIE\n"
 "湘南ビーチFM 78.9 | https://shonanbeachfm.out.airtime.pro/shonanbeachfm_a | JAZZ\n"
-"Nonstop Casiopea | https://nonstopcasiopea.radioca.st/ | FUSION\n"
-"アシヤ・ラヂヲ (AAC) | https://s3.radio.co/sc8d895604/listen | BOSSA NOVA\n"
+"Moon Mission 東京 | http://uk5.internet-radio.com:8306/ | HOUSE\n"
+"J Pop 邦楽 | https://j-pop.stream.laut.fm/j-pop | J-POP\n"
 "OTTAVA クラシック | https://ottava2.out.airtime.pro/ottava2_a | CLASSICAL\n"
 "FM世田谷 83.4 | https://fmsetagaya834.out.airtime.pro/fmsetagaya834_a | TALK\n"
 "RadiCro レディクロ | https://radicrojapan.out.airtime.pro/radicrojapan_a | TALK\n"
 "羊飼いラジオ Hitsujikai | https://streaming.radio.co/se4a8e6a93/listen | TALK\n"
 "Replay News 日本語ニュース | https://replaynewsja.ice.infomaniak.ch/replaynewsja-128.mp3 | NEWS\n";
 
-/* URLs of the list shipped with 1.0.0 and 1.1.0 (both the same). A stations.txt that is exactly that
-   list was never edited, so it is replaced by the new one (the old file is kept as stations.old.txt). */
-static const char* OLD_DEFAULT_URLS[] = {
+/* URLs of older built-in lists. A stations.txt that is exactly one of them was never edited, so it is
+   replaced by the new one (the old file is kept as stations.old.txt).
+   V100: shipped with 1.0.0. V110T: the 1.1.0 test builds (before three stations were changed). */
+static const char* OLD_V100[] = {
     "https://listen.moe/fallback",
     "https://relay0.r-a-d.io/main.mp3",
     "https://stream.gensokyoradio.net/1/",
@@ -71,8 +72,40 @@ static const char* OLD_DEFAULT_URLS[] = {
     "https://replaynewsja.ice.infomaniak.ch/replaynewsja-128.mp3",
     "https://nonstopcasiopea.radioca.st/",
 };
-#define NUM_OLD_DEFAULT (int)(sizeof(OLD_DEFAULT_URLS) / sizeof(OLD_DEFAULT_URLS[0]))
-static int g_replacedFrom[MAX_STATIONS];   /* old index -> OLD_DEFAULT_URLS index, while remapping */
+static const char* OLD_V110T[] = {
+    "https://listen.moe/fallback",
+    "http://radio.kahoku.net:8000/",
+    "https://relay0.r-a-d.io/main.mp3",
+    "https://radio.stereoanime.com/listen/stereoanime/128",
+    "http://play.isla.ovh/vocaloplus",
+    "https://stream.gensokyoradio.net/1/",
+    "https://radio.gotanno.love/",
+    "http://gyusyabu.ddo.jp:8000/",
+    "http://65.21.61.215:8000/citypopone",
+    "https://flyfm.stream.laut.fm/flyfm",
+    "https://eurobeat.stream.laut.fm/eurobeat",
+    "http://abm22.com.au:8000/CONTAINER26",
+    "http://c13.radioboss.fm:8200/stream",
+    "https://j-rock.stream.laut.fm/j-rock",
+    "http://79.120.12.130:8000/visualkei",
+    "https://stream2.rcast.net/70945",
+    "https://server10.reliastream.com/proxy/radiohayama",
+    "https://shonanbeachfm.out.airtime.pro/shonanbeachfm_a",
+    "https://nonstopcasiopea.radioca.st/",
+    "https://s3.radio.co/sc8d895604/listen",
+    "https://ottava2.out.airtime.pro/ottava2_a",
+    "https://fmsetagaya834.out.airtime.pro/fmsetagaya834_a",
+    "https://radicrojapan.out.airtime.pro/radicrojapan_a",
+    "https://streaming.radio.co/se4a8e6a93/listen",
+    "https://replaynewsja.ice.infomaniak.ch/replaynewsja-128.mp3",
+};
+static const struct { const char* const* urls; int n; } OLD_LISTS[] = {
+    { OLD_V100, (int)(sizeof(OLD_V100) / sizeof(OLD_V100[0])) },
+    { OLD_V110T, (int)(sizeof(OLD_V110T) / sizeof(OLD_V110T[0])) },
+};
+#define NUM_OLD_LISTS (int)(sizeof(OLD_LISTS) / sizeof(OLD_LISTS[0]))
+static const char* g_replacedUrl[MAX_STATIONS];   /* old index -> its URL, while remapping */
+static int  g_replacedN = 0;
 static bool g_replaced = false;
 
 static char* trim(char* s) {
@@ -173,24 +206,30 @@ int stations_load(void) {
     return g_stationCount;
 }
 
-/* the untouched old list: same number of stations and every URL one of the old built-in ones, each once */
-static bool is_old_default(void) {
-    if (g_stationCount != NUM_OLD_DEFAULT) return false;
-    bool used[NUM_OLD_DEFAULT] = { false };
+/* an untouched old list: same number of stations and every URL one of that list's, each once */
+static bool matches_old(const char* const* urls, int n) {
+    if (g_stationCount != n || n > MAX_STATIONS) return false;
+    bool used[MAX_STATIONS] = { false };
     for (int i = 0; i < g_stationCount; i++) {
         int k = 0;
-        while (k < NUM_OLD_DEFAULT && (used[k] || strcmp(g_stations[i].url, OLD_DEFAULT_URLS[k]))) k++;
-        if (k == NUM_OLD_DEFAULT) return false;
+        while (k < n && (used[k] || strcmp(g_stations[i].url, urls[k]))) k++;
+        if (k == n) return false;
         used[k] = true;
-        g_replacedFrom[i] = k;
+        g_replacedUrl[i] = urls[k];
     }
+    g_replacedN = n;
     return true;
 }
 
+static bool is_old_default(void) {
+    for (int l = 0; l < NUM_OLD_LISTS; l++) if (matches_old(OLD_LISTS[l].urls, OLD_LISTS[l].n)) return true;
+    return false;
+}
+
 int stations_remap(int oldIndex) {
-    if (!g_replaced || oldIndex < 0 || oldIndex >= NUM_OLD_DEFAULT) return oldIndex;
-    const char* url = OLD_DEFAULT_URLS[g_replacedFrom[oldIndex]];
+    if (!g_replaced || oldIndex < 0 || oldIndex >= g_replacedN) return oldIndex;
+    const char* url = g_replacedUrl[oldIndex];
     for (int i = 0; i < g_stationCount; i++) if (!strcmp(g_stations[i].url, url)) return i;
-    return 0;
+    return oldIndex < g_stationCount ? oldIndex : 0;   /* a station that was swapped: the new one in its place */
 }
 
