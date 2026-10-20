@@ -50,6 +50,7 @@ static int   g_resumeStation = -1;
 static bool  g_audioReady = false, g_audioDown = false;   /* hooks only act after boot, and up only after down */
 static float g_bassEnv = 0, g_bassAvg = 0, g_bassPeak = 0.05f, g_pulse = 0, g_lastBeat = -1;
 static aptHookCookie g_aptCookie;
+static bool g_mcuOk = false;               /* mcu::HWC: exact battery %, volume slider fallback */
 static float g_listScroll = 0, g_listVel = 0;
 static float g_selY = 0, g_selV = 0;
 static float g_changeT = -10;
@@ -294,6 +295,32 @@ static void draw_icy(const PlayerInfo* pi) {
     scissor_end();
 }
 
+/* volume: the console's slider (0-63), shown in the scope header. Dim at rest; lit with the % while
+ * it moves and for 1.5 s after (then it fades for 0.5 s). */
+static int   g_vol = -1;
+static float g_volT = -10;   /* when it last moved */
+
+static void vol_update(void) {
+    u8 v = 0;
+    if (R_FAILED(HIDUSER_GetSoundVolume(&v)) && !(g_mcuOk && R_SUCCEEDED(MCUHWC_GetSoundSliderLevel(&v)))) return;
+    if (v > 63) v = 63;
+    if (g_vol >= 0 && v != g_vol) g_volT = g_t;
+    g_vol = v;
+}
+
+static void draw_vol(void) {
+    if (g_vol < 0) return;
+    float d = g_t - g_volT, f = d < 1.5f ? 1 : d < 2.0f ? (2.0f - d) / 0.5f : 0;
+    float x = 186, y = 128;
+    mono_draw("VOL", x, y, 1, f > 0 ? COL_ACC : COL_DIM, 0);
+    seg_bar(x + 22, y + 1, 12, 5, 1, 6, g_vol / 63.0f, f > 0 ? COL_ACC : col_a(COL_ACC, 0.55f), COL_LINE);
+    if (f > 0) {
+        char pc[12];
+        snprintf(pc, sizeof(pc), "%d%%", (g_vol * 100 + 31) / 63);
+        mono_draw(pc, x + 100, y, 1, col_a(COL_ACC, f), 0);
+    }
+}
+
 static void draw_scope(const PlayerInfo* pi) {
     float bx = 30, by = 124, bw = 340, bh = 78;
     ch_fill(bx, by, bw, bh, 7, CUT_TL | CUT_BR, col_a(COL_PANEL, 0.9f));
@@ -402,6 +429,7 @@ static void render_top(const PlayerInfo* pi) {
     draw_name(pi, idx);
     draw_icy(pi);
     draw_scope(pi);
+    draw_vol();
     draw_footer(pi);
     if (g_fw == FW_NONE) {
         ch_fill(70, 136, 260, 46, 8, CUT_TL | CUT_BR, COL_BLACK);
@@ -484,8 +512,6 @@ static void icon_playstop(float cx, float cy, float m, u32 c) {
     C2D_DrawTriangle(ax, ay, c, bx, by, c, c1x, c1y, c, 0);
     C2D_DrawTriangle(bx, by, c, c2x, c2y, c, c1x, c1y, c, 0);
 }
-
-static bool g_mcuOk = false;
 
 /* 5 squares = 20 % each (1-20 % -> 1 ... 81-100 % -> 5); low under 15 %. Read every 5 s.
    Exact % from mcu::HWC; without it (some .3dsx launchers) the 0-5 level of ptm. */
@@ -1425,6 +1451,7 @@ int main(int argc, char** argv) {
         g_t = (osGetTime() - t0) / 1000.0f;
         hidScanInput();
         sleep_update();
+        vol_update();
         player_get_info(&pi);
         if (power_update(&pi)) { gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
         handle_input(&pi);
