@@ -98,6 +98,7 @@ static const char* STR[S_COUNT][NUM_LANGS] = {
     [S_LINK_NOWIFI]    = { "SIN WI-FI", "NO WI-FI", "Wi-Fiなし" },
     [S_LINK_NOWIFI2]   = { "Conéctate para verlo en el móvil.", "Connect to see it on your phone.", "接続するとスマホで見られます。" },
     [S_SAVED]          = { "GUARDADA", "SAVED", "保存しました" },
+    [S_REMOVED]        = { "ELIMINADA", "REMOVED", "削除しました" },
     [S_HDR_HIST]       = { "HISTORIAL", "HISTORY", "履歴" },
     [S_HIST_EMPTY]     = { "Aún no hay canciones", "No songs yet", "まだ曲がありません" },
     [S_HIST_EMPTY1]    = { "Las canciones se apuntan al sonar 30 s.", "Songs are added after 30 s on air.", "30秒流れた曲が記録されます。" },

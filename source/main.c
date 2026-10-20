@@ -58,7 +58,8 @@ static bool  g_audioReady = false, g_audioDown = false;   /* hooks only act afte
 static float g_bassEnv = 0, g_bassAvg = 0, g_bassPeak = 0.05f, g_pulse = 0, g_lastBeat = -1;
 static aptHookCookie g_aptCookie;
 static bool g_mcuOk = false;               /* mcu::HWC: exact battery %, volume slider fallback */
-static float g_savedT = -10;               /* a song was just saved (B): SIGNAL LOCK shows it for 2 s */
+static float g_savedT = -10;               /* a song was just saved / removed (B): SIGNAL LOCK shows it for 2 s */
+static bool  g_savedLike = true;           /* which of the two */
 static void heart(float cx, float cy, float r, bool filled, u32 c);
 static int  now_song(const PlayerInfo* pi);
 static float g_listScroll = 0, g_listVel = 0;
@@ -272,8 +273,9 @@ static void draw_name(const PlayerInfo* pi, int idx) {
     }
     C2D_DrawRectSolid(30, 88.5f, 0, 340, 1, COL_LINE);
     if (g_t - g_savedT < 2) {   /* song just saved: in place of SIGNAL LOCK, same size, never over anything */
-        float w = lbl(T(S_SAVED), 370, 92, 1, COL_ACC, 2);
-        heart(370 - w - 9, 95.5f, 4.5f, true, COL_ACC);
+        u32 c = g_savedLike ? COL_ACC : COL_DIM;
+        float w = lbl(T(g_savedLike ? S_SAVED : S_REMOVED), 370, 92, 1, c, 2);
+        heart(370 - w - 9, 95.5f, 4.5f, g_savedLike, c);
     } else mono_draw(pi->state == PS_PLAYING ? "SIGNAL LOCK" : "NO SIGNAL", 370, 92, 1, pi->state == PS_PLAYING ? COL_ACC : COL_DIM, 2);
     if (fav_is(idx)) { star(35, 96, 4.5f, true, COL_ACC); mono_draw("FAV", 43, 92, 1, COL_ACC, 0); }
 }
@@ -1623,7 +1625,7 @@ static void save_now_song(const PlayerInfo* pi) {
     if (k < 0) k = hist_add(pi->title, g_playing >= 0 ? g_stations[g_playing].name : "", true);
     else hist_set_liked(k, like);
     player_beep(like ? 0 : 1);
-    if (like) g_savedT = g_t;
+    g_savedT = g_t; g_savedLike = like;
     netlog("history: %s \"%s\"", like ? "saved" : "unsaved", pi->title);
 }
 
