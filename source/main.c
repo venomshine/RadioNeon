@@ -1124,6 +1124,15 @@ static void apt_cb(APT_HookType hook, void* param) {
     }
 }
 
+/* gsp::Lcd only for a moment: the HOME Menu needs that service when it takes over, and if we keep a
+ * session open it waits for it forever (frozen screen, only a forced power-off gets out). Same as ctrmus. */
+static void backlights(bool on) {
+    if (R_FAILED(gspLcdInit())) return;
+    if (on) GSPLCD_PowerOnAllBacklights();
+    else    GSPLCD_PowerOffAllBacklights();
+    gspLcdExit();
+}
+
 static bool power_update(const PlayerInfo* pi) {
     u8 shell = 1;
     PTMU_GetShellState(&shell);
@@ -1139,7 +1148,7 @@ static bool power_update(const PlayerInfo* pi) {
     bool active = g_playing >= 0 && pi->state != PS_STOPPED && pi->state != PS_ERROR;
     bool block = g_cfg.lidPlay && hs && active;
     if (g_lcdOff && (!closed || !block)) {
-        GSPLCD_PowerOnAllBacklights();
+        backlights(true);
         g_lcdOff = false;
         if (closed) netlog("lid: closed but nothing to play any more (state %d) -> sleep", pi->state);
     }
@@ -1148,7 +1157,7 @@ static bool power_update(const PlayerInfo* pi) {
         g_sleepBlocked = block;
     }
     if (closed && block && !g_lcdOff) {
-        GSPLCD_PowerOffAllBacklights();
+        backlights(false);
         g_lcdOff = true;
         netlog("lid: closed with headphones -> screens off, still playing");
     }
@@ -1215,7 +1224,6 @@ int main(int argc, char** argv) {
     romfsInit();
     ptmuInit();
     cfguInit();
-    gspLcdInit();
     g_mcuOk = R_SUCCEEDED(mcuHwcInit());
     gfxInitDefault();
     C3D_Init(C3D_DEFAULT_CMDBUF_SIZE * 2);
@@ -1281,13 +1289,12 @@ int main(int argc, char** argv) {
     g_cfg.station = g_playing >= 0 ? g_playing : g_sel;
     config_save();
     aptSetSleepAllowed(true);
-    if (g_lcdOff) GSPLCD_PowerOnAllBacklights();
+    if (g_lcdOff) backlights(true);
     aptUnhook(&g_aptCookie);
     player_exit();
     C2D_Fini();
     C3D_Fini();
     gfxExit();
-    gspLcdExit();
     if (g_mcuOk) mcuHwcExit();
     cfguExit();
     ptmuExit();
