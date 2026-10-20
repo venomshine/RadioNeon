@@ -38,6 +38,7 @@ void player_exit(void);
 void player_play(const char* url);
 void player_stop(void);
 void player_set_volume(float v);
+void player_beep(int kind);    /* 0 = song saved (two rising pips), 1 = removed (one low pip) */
 void player_get_info(PlayerInfo* out);
 /* Fills `n` spectrum bands (0..1) from the audio that is playing right now.
    Returns overall level 0..1. */

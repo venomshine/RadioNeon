@@ -723,6 +723,60 @@ void player_set_ndsp(bool ok) {
     LightLock_Unlock(&g_lock);
 }
 
+/* ------------------------------------------------------------------ UI beeps
+ * Same style as the HOME banner sound (square pulses of 60 ms with 30 ms gaps, 1470 / 1954 Hz), on its own
+ * ndsp channel so the station keeps playing. Generated once into linear memory. */
+#define SFX_CHN   1
+#define SFX_RATE  32728
+static s16* g_sfx[2];
+static int  g_sfxLen[2];
+static ndspWaveBuf g_sfxWb;
+
+static int sfx_tone(s16* out, int at, float hz, int ms, float amp) {
+    int n = SFX_RATE * ms / 1000, ramp = SFX_RATE * 2 / 1000;   /* 2 ms fades: no clicks */
+    for (int i = 0; i < n; i++) {
+        float ph = fmodf(i * hz / SFX_RATE, 1.0f), g = 1;
+        if (i < ramp) g = (float)i / ramp; else if (i > n - ramp) g = (float)(n - i) / ramp;
+        if (out) out[at + i] = (s16)((ph < 0.5f ? amp : -amp) * g * 32767);
+    }
+    return at + n;
+}
+
+static int sfx_build(s16* out, int kind) {
+    int at = 0;
+    if (kind == 0) {   /* saved: two rising pips */
+        at = sfx_tone(out, at, 1470, 60, 0.22f);
+        at = sfx_tone(out, at, 0, 30, 0);
+        at = sfx_tone(out, at, 1954, 60, 0.22f);
+    } else at = sfx_tone(out, at, 876, 70, 0.18f);   /* removed: one low pip */
+    return at;
+}
+
+void player_beep(int kind) {
+    if (kind < 0 || kind > 1) return;
+    LightLock_Lock(&g_lock);
+    if (!g_ndspOk) { LightLock_Unlock(&g_lock); return; }
+    if (!g_sfx[kind]) {
+        g_sfxLen[kind] = sfx_build(NULL, kind);
+        g_sfx[kind] = linearAlloc(g_sfxLen[kind] * sizeof(s16));
+        if (g_sfx[kind]) { sfx_build(g_sfx[kind], kind); DSP_FlushDataCache(g_sfx[kind], g_sfxLen[kind] * sizeof(s16)); }
+    }
+    if (g_sfx[kind]) {
+        ndspChnWaveBufClear(SFX_CHN);
+        ndspChnReset(SFX_CHN);   /* ndsp may have been restarted (HOME / sleep): set it up every time */
+        ndspChnSetInterp(SFX_CHN, NDSP_INTERP_NONE);
+        ndspChnSetFormat(SFX_CHN, NDSP_FORMAT_MONO_PCM16);
+        ndspChnSetRate(SFX_CHN, SFX_RATE);
+        float mix[12] = {0}; mix[0] = mix[1] = 1.0f;
+        ndspChnSetMix(SFX_CHN, mix);
+        memset(&g_sfxWb, 0, sizeof(g_sfxWb));
+        g_sfxWb.data_pcm16 = g_sfx[kind];
+        g_sfxWb.nsamples = g_sfxLen[kind];
+        ndspChnWaveBufAdd(SFX_CHN, &g_sfxWb);
+    }
+    LightLock_Unlock(&g_lock);
+}
+
 void player_set_volume(float v) {
     LightLock_Lock(&g_lock);
     g_volume = v;

@@ -25,6 +25,7 @@
 #include "netlog.h"
 #include "app.h"
 #include "qrcodegen.h"
+#include "history.h"
 
 #define TOP_W 400
 #define BOT_W 320
@@ -35,7 +36,7 @@
 static C3D_RenderTarget *g_top, *g_bot;
 static float g_t;
 static int   g_sel = 0, g_playing = -1;   /* g_sel = current station (playing, or the last one played) */
-enum { M_CTRL = 0, M_LIST, M_MENU, M_OPT, M_ABOUT, M_SLEEP };
+enum { M_CTRL = 0, M_LIST, M_MENU, M_OPT, M_ABOUT, M_SLEEP, M_HIST };
 static int   g_mode = M_CTRL;
 static int   g_view[MAX_STATIONS], g_viewN = 0, g_cur = 0;   /* list view (all or favourites) */
 static bool  g_favView = false;
@@ -51,6 +52,9 @@ static bool  g_audioReady = false, g_audioDown = false;   /* hooks only act afte
 static float g_bassEnv = 0, g_bassAvg = 0, g_bassPeak = 0.05f, g_pulse = 0, g_lastBeat = -1;
 static aptHookCookie g_aptCookie;
 static bool g_mcuOk = false;               /* mcu::HWC: exact battery %, volume slider fallback */
+static float g_savedT = -10;               /* a song was just saved (B): SIGNAL LOCK shows it for 2 s */
+static void heart(float cx, float cy, float r, bool filled, u32 c);
+static int  now_song(const PlayerInfo* pi);
 static float g_listScroll = 0, g_listVel = 0;
 static float g_selY = 0, g_selV = 0;
 static float g_changeT = -10;
@@ -98,6 +102,22 @@ static void scanlines(float w) {
 static void seg_bar(float x, float y, int n, float segw, float gap, float h, float v, u32 on, u32 off) {
     int k = (int)(v * n + 0.5f);
     for (int i = 0; i < n; i++) C2D_DrawRectSolid(x + i * (segw + gap), y, 0, segw, h, i < k ? on : off);
+}
+
+/* heart (saved songs): the classic parametric curve, filled or outline */
+static void heart(float cx, float cy, float r, bool filled, u32 c) {
+    enum { N = 32 };
+    float px[N], py[N];
+    for (int i = 0; i < N; i++) {
+        float t = i * 2 * (float)M_PI / N, st = sinf(t);
+        float x = 16 * st * st * st, y = 13 * cosf(t) - 5 * cosf(2 * t) - 2 * cosf(3 * t) - cosf(4 * t);
+        px[i] = cx + x * r / 16; py[i] = cy - y * r / 16;
+    }
+    for (int i = 0; i < N; i++) {
+        int j = (i + 1) % N;
+        if (filled) C2D_DrawTriangle(cx, cy, c, px[i], py[i], c, px[j], py[j], c, 0);
+        else C2D_DrawLine(px[i], py[i], c, px[j], py[j], c, 1.2f, 0);
+    }
 }
 
 /* 5-point star: filled (favourite) or outline */
@@ -248,7 +268,10 @@ static void draw_name(const PlayerInfo* pi, int idx) {
     if (w > 340) w = 340;
     C2D_DrawRectSolid(30, 88, 0, w * ease_out_cubic(dt / 0.6f), 2, COL_ACC);
     C2D_DrawRectSolid(30 + w + 4, 88.5f, 0, 370 - (30 + w + 4), 1, COL_LINE);
-    mono_draw(pi->state == PS_PLAYING ? "SIGNAL LOCK" : "NO SIGNAL", 370, 92, 1, pi->state == PS_PLAYING ? COL_ACC : COL_DIM, 2);
+    if (g_t - g_savedT < 2) {   /* song just saved: in place of SIGNAL LOCK, same size, never over anything */
+        float w = lbl(T(S_SAVED), 370, 92, 1, COL_ACC, 2);
+        heart(370 - w - 9, 95.5f, 4.5f, true, COL_ACC);
+    } else mono_draw(pi->state == PS_PLAYING ? "SIGNAL LOCK" : "NO SIGNAL", 370, 92, 1, pi->state == PS_PLAYING ? COL_ACC : COL_DIM, 2);
     if (fav_is(idx)) { star(35, 96, 4.5f, true, COL_ACC); mono_draw("FAV", 43, 92, 1, COL_ACC, 0); }
 }
 
@@ -284,7 +307,15 @@ static void draw_icy(const PlayerInfo* pi) {
     else if (pi->icyName[0]) snprintf(line, sizeof(line), "%s", pi->icyName);
     else { snprintf(line, sizeof(line), "%s", T(S_NO_ICY)); lc = COL_DIM; }
     mono_draw(pi->state == PS_ERROR ? "ERR>" : net ? "NET>" : "NOW>", 30, 106, 1, pi->state == PS_ERROR || net ? COL_RED : COL_ACC, 0);
-    float x0 = 60, x1 = 370, tw = text_width(line, 0.5f);
+    float x0 = 60, x1 = 370;
+    if (pi->title[0] && !net && pi->state != PS_ERROR) {   /* B saves the song that is playing */
+        int k = now_song(pi);
+        bool saved = k >= 0 && g_songs[k].liked;
+        mono_draw("[B]", 352, 106, 1, saved ? COL_ACC : COL_DIM, 2);
+        heart(363, 109.5f, 5, saved, saved ? COL_ACC : COL_DIM);
+        x1 = 330;
+    }
+    float tw = text_width(line, 0.5f);
     scissor_begin(true, x0, 100, x1 - x0, 18);
     if (tw <= x1 - x0) text_draw(line, x0, 101, 0.5f, lc, 0);
     else {
@@ -444,7 +475,7 @@ static void render_top(const PlayerInfo* pi) {
 /* --------------------------------------------------------------- bottom screen */
 typedef struct { float x, y, w, h, press; } Btn;
 static Btn B_CARD = { 10, 24, 300, 62, 0 }, B_CSTAR = { 266, 24, 44, 62, 0 };   /* star: right column of the card */
-static Btn B_SHUF = { 10, 93, 146, 19, 0 }, B_SLEEP = { 164, 93, 146, 19, 0 };  /* chips row (room for a third one in the middle) */
+static Btn B_SHUF = { 10, 93, 120, 19, 0 }, B_HIST = { 136, 93, 48, 19, 0 }, B_SLEEP = { 190, 93, 120, 19, 0 };   /* chips row */
 static Btn B_PREV = { 10, 118, 84, 68, 0 }, B_PLAY = { 104, 118, 112, 68, 0 }, B_NEXT = { 226, 118, 84, 68, 0 };
 static Btn B_MENU = { 10, 194, 146, 36, 0 }, B_EXIT = { 164, 194, 146, 36, 0 };
 static Btn B_BACK = { 8, 6, 76, 20, 0 };
@@ -470,6 +501,14 @@ static void icon_shuffle(float cx, float cy, float s, u32 c) {
         float ty = cy + k * s * 0.55f;
         C2D_DrawTriangle(cx + s, ty, c, cx + s * 0.45f, ty - 3.5f, c, cx + s * 0.45f, ty + 3.5f, c, 0);
     }
+}
+
+/* song history: list lines + a music note */
+static void icon_history(float cx, float cy, u32 c) {
+    for (int i = -1; i <= 1; i++) C2D_DrawRectSolid(cx - 11, cy + i * 4 - 0.5f, 0, i == 1 ? 7 : 12, 1.5f, c);
+    C2D_DrawCircleSolid(cx + 6, cy + 4, 0, 2.6f, c);
+    C2D_DrawRectSolid(cx + 7.6f, cy - 6, 0, 1.4f, 10, c);
+    C2D_DrawLine(cx + 8.3f, cy - 6, c, cx + 12, cy - 3, c, 1.4f, 0);
 }
 
 /* sleep timer: clock face with hands */
@@ -609,8 +648,8 @@ static void render_controls(const PlayerInfo* pi) {
         ch_fill(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, b->press > 0.35f ? COL_ACC : COL_CARBON);
         ch_outline(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, on ? COL_ACC : COL_LINE, 1);
         icon_shuffle(b->x + 16, b->y + 9.5f, 6, col);
-        float tx = lbl(T(S_CHIP_SHUFFLE), b->x + 30, b->y + 6, 1, col, 0);
-        mono_draw(on ? "ON" : "OFF", b->x + 30 + tx + 8, b->y + 6, 1, col, 0);
+        float tx = lbl(T(S_CHIP_SHUFFLE), b->x + 28, b->y + 6, 1, col, 0);
+        mono_draw(on ? "ON" : "OFF", b->x + 28 + tx + 6, b->y + 6, 1, col, 0);
 
         on = g_sleepEnd != 0;
         b = &B_SLEEP;
@@ -618,10 +657,14 @@ static void render_controls(const PlayerInfo* pi) {
         ch_fill(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, b->press > 0.35f ? COL_ACC : COL_CARBON);
         ch_outline(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, on ? COL_ACC : COL_LINE, 1);
         icon_timer(b->x + 16, b->y + 10, 5, col);
-        tx = lbl(T(on ? S_CHIP_SLEEP_ON : S_CHIP_SLEEP_OFF), b->x + 30, b->y + 6, 1, col, 0);
-        char left[16] = "OFF";
-        if (on) sleep_left_str(left, sizeof(left));
-        mono_draw(left, b->x + 30 + tx + 8, b->y + 6, 1, col, 0);
+        tx = lbl(T(on ? S_CHIP_SLEEP_ON : S_CHIP_SLEEP_OFF), b->x + 28, b->y + 6, 1, col, 0);
+        if (on) { char left[16]; sleep_left_str(left, sizeof(left)); mono_draw(left, b->x + 28 + tx + 5, b->y + 6, 1, col, 0); }
+
+        b = &B_HIST;   /* centre: song history (DOWN) */
+        col = b->press > 0.35f ? COL_BLACK : COL_ACC;
+        ch_fill(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, b->press > 0.35f ? COL_ACC : COL_CARBON);
+        ch_outline(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, COL_ACC, 1);
+        icon_history(b->x + b->w / 2, b->y + b->h / 2, col);
     }
     /* transport */
     hud_button(&B_PREV, CUT_TL | CUT_BL, false);
@@ -971,6 +1014,113 @@ static void render_sleep(void) {
     }
 }
 
+/* ---------------- song history */
+static int   g_songCur = 0;
+static float g_songScroll = 0;
+#define HIST_OPEN_DROP 0.10f   /* a line drops from the button to the bottom edge... */
+#define HIST_OPEN_RISE 0.16f   /* ...and the screen opens upwards behind it */
+
+static void render_history(void) {
+    float vis = SCR_H - LIST_Y, target = g_songCur * ROW_H - vis / 2 + ROW_H / 2;
+    float mx = g_songCount * ROW_H - vis;
+    if (target > mx) target = mx;
+    if (target < 0) target = 0;
+    g_songScroll += (target - g_songScroll) * 0.3f;
+    dashed_vline(5, LIST_Y, SCR_H, 3, 3, COL_LINE);
+    scissor_begin(false, 0, LIST_Y, BOT_W, vis);
+    for (int k = 0; k < g_songCount; k++) {
+        float y = LIST_Y + k * ROW_H - g_songScroll;
+        if (y < LIST_Y - ROW_H || y > SCR_H) continue;
+        const HistEntry* e = &g_songs[k];
+        bool sel = k == g_songCur;
+        if (sel) {
+            ch_fill(14, y + 1, 292, ROW_H - 2, 5, CUT_TL | CUT_BR, COL_CARBON);
+            ch_outline(14, y + 1, 292, ROW_H - 2, 5, CUT_TL | CUT_BR, COL_ACC, 1);
+        } else C2D_DrawRectSolid(14, y + ROW_H - 1, 0, 292, 1, COL_LINE);
+        struct tm* tm = localtime(&e->when);
+        char hm[8]; snprintf(hm, sizeof(hm), "%02d:%02d", tm ? tm->tm_hour : 0, tm ? tm->tm_min : 0);
+        mono_draw(hm, 20, y + 9, 1, sel ? COL_ACC : COL_DIM, 0);
+        text_draw(e->title, 56, y + 3, text_fit(e->title, 0.5f, 220), sel ? COL_TEXT : col_a(COL_TEXT, 0.8f), 0);
+        lbl(e->station, 56, y + 21, 1, col_a(COL_DIM, sel ? 1 : 0.7f), 0);
+        heart(292, y + ROW_H / 2, 6, e->liked, e->liked ? COL_ACC : col_a(COL_DIM, 0.6f));
+    }
+    scissor_end();
+    if (!g_songCount) {
+        icon_history(160, 96, col_a(COL_ACC, 0.6f));
+        lbl(T(S_HIST_EMPTY), 160, 120, 2, COL_TEXT, 1);
+        lbl(T(S_HIST_EMPTY1), 160, 146, 1, COL_DIM, 1);
+        lbl(T(S_HIST_EMPTY2), 160, 158, 1, COL_DIM, 1);
+    }
+    int liked = 0;
+    for (int k = 0; k < g_songCount; k++) liked += g_songs[k].liked;
+    char cnt[24]; snprintf(cnt, sizeof(cnt), "%d // %d  ", g_songCount, liked);
+    sub_header(T(S_HDR_HIST), "履歴", cnt);
+    heart(303, 15, 4.5f, true, COL_ACC);
+}
+
+/* Spotify search for a song: open.spotify.com/search/<title, percent-encoded> */
+static void spotify_url(const char* title, char* out, size_t n) {
+    static const char HEX[] = "0123456789ABCDEF";
+    size_t k = snprintf(out, n, "https://open.spotify.com/search/");
+    for (const unsigned char* p = (const unsigned char*)title; *p && k + 4 < n; p++) {
+        unsigned char c = *p;
+        if (c == ' ' && p[1] == '-' && p[2] == ' ') { p += 2; c = ' '; }   /* "Artist - Song" -> "Artist Song" */
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_' || c == '.' || c == '~') out[k++] = c;
+        else { out[k++] = '%'; out[k++] = HEX[c >> 4]; out[k++] = HEX[c & 15]; }
+    }
+    out[k] = 0;
+}
+
+static void render_top_hist(void) {
+    C2D_DrawRectSolid(0, 0, 0, TOP_W, SCR_H, COL_BG);
+    dot_matrix(TOP_W);
+    ch_outline(4, 4, 392, 232, 10, CUT_TL | CUT_BR, COL_LINE, 1);
+    C2D_DrawLine(4, 14, COL_ACC, 14, 4, COL_ACC, 2, 0);
+    C2D_DrawLine(386, 236, COL_ACC, 396, 226, COL_ACC, 2, 0);
+    mono_draw("RADIO//NEON", 18, 10, 1, COL_ACC, 0);
+    mono_draw("HISTORY // LINK", 88, 10, 1, COL_DIM, 0);
+    C2D_DrawRectSolid(14, 24, 0, 372, 1, COL_LINE);
+    C2D_DrawRectSolid(14, 24, 0, 30, 1, COL_ACC);
+    if (g_songCount) {
+        const HistEntry* e = &g_songs[g_songCur];
+        static uint8_t qr[qrcodegen_BUFFER_LEN_MAX], tmp[qrcodegen_BUFFER_LEN_MAX];
+        static char done[sizeof(e->title)] = "";
+        static bool ok = false;
+        if (strcmp(done, e->title)) {   /* encode once per song */
+            char url[600];
+            spotify_url(e->title, url, sizeof(url));
+            ok = qrcodegen_encodeText(url, tmp, qr, qrcodegen_Ecc_LOW, 3, 25, qrcodegen_Mask_AUTO, true);
+            snprintf(done, sizeof(done), "%s", e->title);
+        }
+        float tx = 46;
+        if (ok) {
+            int n = qrcodegen_getSize(qr), px = 156 / n;
+            if (px < 1) px = 1;
+            float qs = n * px, qx = 46, qy = 129 - qs / 2;   /* centred in the area under the header */
+            draw_qr(qr, qx, qy, px);
+            brackets(qx - 10, qy - 10, qs + 20, qs + 20, 7, col_a(COL_ACC, 0.6f), 1);
+            tx = qx + qs + 30;
+        }
+        float ty = 129 - 46, tw = 376 - tx;
+        mono_draw("SPOTIFY", tx, ty, 2, COL_ACC, 0);
+        char a[160], b[160];
+        const char* dash = strstr(e->title, " - ");
+        if (dash) { snprintf(a, sizeof(a), "%.*s", (int)(dash - e->title), e->title); snprintf(b, sizeof(b), "%s", dash + 3); }
+        else { snprintf(a, sizeof(a), "%s", e->title); b[0] = 0; }
+        text_draw(a, tx, ty + 24, text_fit(a, 0.6f, tw), COL_TEXT, 0);
+        if (b[0]) text_draw(b, tx, ty + 44, text_fit(b, 0.6f, tw), COL_TEXT, 0);
+        struct tm* tm = localtime(&e->when);
+        char st[96]; snprintf(st, sizeof(st), "%s // %02d:%02d", e->station, tm ? tm->tm_hour : 0, tm ? tm->tm_min : 0);
+        lbl(st, tx, ty + 70, 1, COL_DIM, 0);
+        text_draw(T(S_HIST_SCAN), tx, ty + 82, 0.5f, COL_TEXT, 0);
+        text_draw(T(S_HIST_KEYS), tx, ty + 102, 0.42f, COL_ACC, 0);
+    } else {
+        icon_history(200, 112, col_a(COL_ACC, 0.5f));
+        lbl(T(S_HIST_EMPTY1), 200, 134, 1, COL_DIM, 1);
+    }
+    scanlines(TOP_W);
+}
+
 static void render_bottom(const PlayerInfo* pi) {
     C2D_DrawRectSolid(0, 0, 0, BOT_W, SCR_H, COL_BG);
     dot_matrix(BOT_W);
@@ -981,6 +1131,27 @@ static void render_bottom(const PlayerInfo* pi) {
         case M_MENU: render_menu(); break;
         case M_OPT: render_options(); break;
         case M_SLEEP: render_sleep(); break;
+        case M_HIST: {
+            /* opening: a line drops from the button to the bottom edge, then the screen opens upwards */
+            float d = g_t - g_modeT;
+            if (d < HIST_OPEN_DROP + HIST_OPEN_RISE) {
+                render_controls(pi);
+                float top = SCR_H - 2;
+                if (d < HIST_OPEN_DROP) {
+                    float y = B_HIST.y + B_HIST.h + (SCR_H - 2 - B_HIST.y - B_HIST.h) * ease_out_cubic(d / HIST_OPEN_DROP);
+                    C2D_DrawRectSolid(B_HIST.x + B_HIST.w / 2 - 1, B_HIST.y + B_HIST.h, 0, 2, y - B_HIST.y - B_HIST.h, COL_ACC);
+                } else {
+                    top = (SCR_H - 2) * (1 - ease_out_cubic((d - HIST_OPEN_DROP) / HIST_OPEN_RISE));
+                    C2D_DrawRectSolid(0, top, 0, BOT_W, SCR_H - top, COL_BG);   /* the screen rises glued to the line */
+                    C2D_ViewTranslate(0, top);
+                    dot_matrix(BOT_W);
+                    render_history();
+                    C2D_ViewReset();
+                }
+                C2D_DrawRectSolid(0, top, 0, BOT_W, 2, COL_ACC);
+            } else render_history();
+            break;
+        }
         default: render_about(); break;
     }
     if (g_dialog) render_dialog();
@@ -993,7 +1164,7 @@ static void render_bottom(const PlayerInfo* pi) {
         float r = 22 - d * 12;
         brackets(l->x - r, l->y - r, r * 2, r * 2, 5, col_a(COL_ACC, 1 - d), 1);
     }
-    float mf = 1 - (g_t - g_modeT) / 0.2f;
+    float mf = g_mode == M_HIST ? 0 : 1 - (g_t - g_modeT) / 0.2f;   /* the history has its own opening */
     if (mf > 0) { float y = (1 - mf) * SCR_H; C2D_DrawRectSolid(0, y, 0, BOT_W, 2, col_a(COL_ACC, mf)); }
     scanlines(BOT_W);
 }
@@ -1118,12 +1289,42 @@ static void sleep_select(int i) {
 
 static void toggle_shuffle(void) { g_cfg.shuffle = !g_cfg.shuffle; g_histN = 0; config_save(); }
 
+/* the history entry of the song that is playing (-1: not recorded yet) */
+static int now_song(const PlayerInfo* pi) {
+    if (!pi->title[0] || !g_songCount) return -1;
+    return strcmp(g_songs[0].title, pi->title) ? hist_find(pi->title) : 0;
+}
+
+/* B on the main screen: save / unsave the song that is playing */
+static void save_now_song(const PlayerInfo* pi) {
+    if (!pi->title[0] || pi->state != PS_PLAYING) return;
+    int k = now_song(pi);
+    bool like = k < 0 || !g_songs[k].liked;
+    if (k < 0) k = hist_add(pi->title, g_playing >= 0 ? g_stations[g_playing].name : "", true);
+    else hist_set_liked(k, like);
+    player_beep(like ? 0 : 1);
+    if (like) g_savedT = g_t;
+    netlog("history: %s \"%s\"", like ? "saved" : "unsaved", pi->title);
+}
+
+static void open_history(void) {
+    g_songCur = 0; g_songScroll = 0;
+    set_mode(M_HIST);
+}
+
+static void toggle_song_like(int k) {
+    if (k < 0 || k >= g_songCount) return;
+    bool like = !g_songs[k].liked;
+    hist_set_liked(k, like);
+    player_beep(like ? 0 : 1);
+}
+
 static void to_menu(void) { g_selY = g_menuCur * MENU_H; g_selV = 0; set_mode(M_MENU); }
 
 static void go_back(void) {
     if (g_mode == M_LIST) { if (g_listFrom == M_MENU) to_menu(); else set_mode(M_CTRL); }
     else if (g_mode == M_OPT || g_mode == M_ABOUT) to_menu();
-    else if (g_mode == M_MENU || g_mode == M_SLEEP) set_mode(M_CTRL);
+    else if (g_mode == M_MENU || g_mode == M_SLEEP || g_mode == M_HIST) set_mode(M_CTRL);
 }
 
 static void handle_input(const PlayerInfo* pi) {
@@ -1148,7 +1349,9 @@ static void handle_input(const PlayerInfo* pi) {
      *   everywhere : START exit dialog · L / R previous / next station (or random with shuffle), except in CTRL
      *   CTRL       : A play/stop · Y favourite · X menu · SELECT list · LEFT/RIGHT previous / next
      *                L shuffle on/off · R sleep timer (the chips under the card, same sides)
+     *                DOWN song history · B save / unsave the song that is playing
      *   SLEEP      : UP/DOWN · A choose · B back
+     *   HISTORY    : UP/DOWN move · LEFT/RIGHT page · Y save / unsave · B back
      *   LIST       : UP/DOWN move · LEFT/RIGHT page · A play · Y favourite · B back · SELECT reload stations.txt
      *   MENU       : UP/DOWN · A open · B or X close
      *   OPTIONS    : UP/DOWN · LEFT/RIGHT or A change · B back
@@ -1157,7 +1360,7 @@ static void handle_input(const PlayerInfo* pi) {
     if (g_mode == M_CTRL) {
         if (kd & KEY_L) { B_SHUF.press = 1; toggle_shuffle(); }
         if (kd & KEY_R) { B_SLEEP.press = 1; open_sleep(); return; }
-    } else if (g_mode != M_SLEEP) {
+    } else if (g_mode != M_SLEEP && g_mode != M_HIST) {
         if (kd & KEY_L) step_station(-1);
         if (kd & KEY_R) step_station(1);
         if (kd & (KEY_L | KEY_R)) list_sync_cursor();
@@ -1177,6 +1380,8 @@ static void handle_input(const PlayerInfo* pi) {
             if (kd & KEY_Y) toggle_fav(g_sel);
             if (kd & KEY_X) { g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); }
             if (kd & KEY_SELECT) open_list(false, M_CTRL);
+            if (kd & KEY_B) save_now_song(pi);
+            if (kd & (KEY_DDOWN | KEY_CPAD_DOWN)) { B_HIST.press = 1; open_history(); return; }
             if (horiz) step_station(horiz);
             break;
         case M_LIST:
@@ -1207,6 +1412,16 @@ static void handle_input(const PlayerInfo* pi) {
             if (vert) g_optCur = (g_optCur + vert + NOPT) % NOPT;
             if (horiz) opt_change(g_optCur, horiz);
             break;
+        case M_HIST:
+            if (kd & KEY_B) go_back();
+            if (kd & KEY_Y) toggle_song_like(g_songCur);
+            if (vert && g_songCount) g_songCur = (g_songCur + vert + g_songCount) % g_songCount;
+            if (horiz && g_songCount) {
+                g_songCur += horiz * 6;
+                if (g_songCur < 0) g_songCur = 0;
+                if (g_songCur >= g_songCount) g_songCur = g_songCount - 1;
+            }
+            break;
         case M_SLEEP:
             if (kd & KEY_A) sleep_select(g_sleepCur);
             if (kd & KEY_B) go_back();
@@ -1227,6 +1442,7 @@ static void handle_input(const PlayerInfo* pi) {
             else if (hit(&B_CSTAR, x, y)) { press(&B_CSTAR, x, y); toggle_fav(g_sel); }
             else if (hit(&B_SHUF, x, y)) { press(&B_SHUF, x, y); toggle_shuffle(); }
             else if (hit(&B_SLEEP, x, y)) { press(&B_SLEEP, x, y); open_sleep(); }
+            else if (hit(&B_HIST, x, y)) { press(&B_HIST, x, y); open_history(); }
             else if (hit(&B_CARD, x, y)) { press(&B_CARD, x, y); open_list(false, M_CTRL); }
             else if (hit(&B_MENU, x, y)) { press(&B_MENU, x, y); g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); }
             else if (hit(&B_EXIT, x, y)) { press(&B_EXIT, x, y); open_dialog(); }
@@ -1244,6 +1460,12 @@ static void handle_input(const PlayerInfo* pi) {
                     g_cfg.accent = (x - 20) / 24; config_apply_accent(); config_save();
                 } else opt_change(i, 1);
                 break;
+            }
+        } else if (g_mode == M_HIST) {
+            int k = (int)((y - LIST_Y + g_songScroll) / ROW_H);
+            if (y >= LIST_Y && k >= 0 && k < g_songCount) {
+                add_lock(x, y);
+                if (x >= 278) toggle_song_like(k); else g_songCur = k;
             }
         } else if (g_mode == M_SLEEP) {
             for (int i = 0; i < NSLEEP; i++) {
@@ -1420,6 +1642,20 @@ static void update_scope(void) {
     g_pulse *= 0.88f;
 }
 
+/* a song goes into the history once its title has been on air for 30 s (jingles and ads between songs
+   are shorter), or straight away when it is saved with B */
+static void hist_track(const PlayerInfo* pi) {
+    static char cur[sizeof(pi->title)] = "";
+    static float since = 0;
+    static bool done = false;
+    if (pi->state != PS_PLAYING || !pi->title[0] || g_playing < 0) { cur[0] = 0; return; }
+    if (strcmp(cur, pi->title)) { snprintf(cur, sizeof(cur), "%s", pi->title); since = g_t; done = now_song(pi) == 0; return; }
+    if (!done && g_t - since >= 30) {
+        hist_add(pi->title, g_stations[g_playing].name, false);
+        done = true;
+    }
+}
+
 /* --------------------------------------------------------------- main */
 int main(int argc, char** argv) {
     osSetSpeedupEnable(true);
@@ -1447,6 +1683,7 @@ int main(int argc, char** argv) {
     }
     i18n_resolve(g_cfg.lang);
     fav_load();
+    hist_load();
     if (g_cfg.station >= 0 && g_cfg.station < g_stationCount) g_sel = g_cfg.station;
     build_view();
     player_init();
@@ -1468,11 +1705,12 @@ int main(int argc, char** argv) {
         if (power_update(&pi)) { gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
         handle_input(&pi);
         player_get_info(&pi);
+        hist_track(&pi);
 
         float target = (pi.state == PS_STOPPED || pi.state == PS_ERROR) ? 0 : 1;
         g_morph += (target - g_morph) * 0.2f;
-        Btn* bs[] = { &B_PREV, &B_NEXT, &B_PLAY, &B_MENU, &B_EXIT, &B_CARD, &B_BACK, &B_CSTAR, &B_DOK, &B_DNO, &B_SHUF, &B_SLEEP };
-        for (int i = 0; i < 12; i++) bs[i]->press *= 0.82f;
+        Btn* bs[] = { &B_PREV, &B_NEXT, &B_PLAY, &B_MENU, &B_EXIT, &B_CARD, &B_BACK, &B_CSTAR, &B_DOK, &B_DNO, &B_SHUF, &B_SLEEP, &B_HIST };
+        for (int i = 0; i < 13; i++) bs[i]->press *= 0.82f;
 
         float nb[NBANDS];
         player_get_spectrum(nb, NBANDS);
@@ -1488,7 +1726,7 @@ int main(int argc, char** argv) {
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         C2D_TargetClear(g_top, COL_BG);
         C2D_SceneBegin(g_top);
-        render_top(&pi);
+        if (g_mode == M_HIST && g_t - g_modeT >= HIST_OPEN_DROP + HIST_OPEN_RISE) render_top_hist(); else render_top(&pi);
         C2D_TargetClear(g_bot, COL_BG);
         C2D_SceneBegin(g_bot);
         render_bottom(&pi);

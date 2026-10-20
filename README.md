@@ -32,6 +32,7 @@ Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, ci
 - **HTTPS verificado** con los certificados raíz de Mozilla incluidos en la app.
 - **Nunca se rinde:** si se corta la emisora o el Wi-Fi, vuelve a conectar sola. Mientras tanto te dice el motivo real (sin Wi-Fi, el servidor no responde, HTTP 404…) y cuánto falta para el siguiente intento.
 - **Favoritas** (Y o tocando la estrella) y **aleatorio** (L o su botón): NEXT salta a una emisora al azar sin repetir las últimas.
+- **Historial de canciones** (↓ o el botón del centro): se apuntan solas las que suenan al menos 30 s. **B** guarda con ♥ la que está sonando, con un bip-bip. Cada canción tiene un QR para buscarla en Spotify desde el móvil.
 - **Temporizador de apagado** (R o su botón): 15, 30, 60, 90 minutos o los que quieras; la radio baja el volumen poco a poco y se para sola. Con la tapa cerrada, la consola se va a dormir.
 - **Osciloscopio y espectro** del audio que suena, con detector de ritmo, y **barra de volumen** que sigue al deslizador de la consola.
 - **Tapa cerrada + auriculares:** sigue sonando con las pantallas apagadas. Si quitas los auriculares, se para; nunca suena por los altavoces con la tapa cerrada.
@@ -61,11 +62,12 @@ Necesitas una 3DS / 2DS / New 3DS con CFW (Luma3DS) y Wi-Fi configurado.
 | Pantalla | Botones |
 |---|---|
 | En todas | **START** salir (pregunta antes) · **L / R** emisora anterior / siguiente (salvo en la principal) |
-| Principal | **A** reproducir / parar · **Y** favorita · **X** menú · **SELECT** lista de emisoras · **← / →** anterior / siguiente · **L** aleatorio · **R** temporizador |
+| Principal | **A** reproducir / parar · **Y** favorita · **X** menú · **SELECT** lista de emisoras · **← / →** anterior / siguiente · **L** aleatorio · **R** temporizador · **↓** historial · **B** guardar la canción que suena |
 | Lista de emisoras | **↑ / ↓** moverse · **← / →** pasar página · **A** reproducir · **Y** favorita · **B** volver · **SELECT** recargar `stations.txt` |
 | Menú | **↑ / ↓** · **A** abrir · **B** o **X** cerrar |
 | Opciones | **↑ / ↓** · **← / →** o **A** cambiar · **B** volver |
 | Temporizador | **↑ / ↓** · **A** elegir · **B** volver |
+| Historial | **↑ / ↓** moverse · **← / →** pasar página · **Y** guardar / quitar ♥ · **B** volver |
 | Acerca de | **B** volver |
 
 Todo se puede hacer también con la pantalla táctil. El volumen se controla con el deslizador de la consola.
@@ -74,6 +76,7 @@ Todo se puede hacer también con la pantalla táctil. El volumen se controla con
 
 - `stations.txt`: las emisoras, una por línea con el formato `Nombre | URL | Género` (el género es opcional); `#` es un comentario. Si lo borras, se vuelve a crear con la lista por defecto. Formatos: MP3 y AAC/AAC+ (ADTS). No se admiten Ogg/Opus, HLS (`.m3u8`) ni listas `.pls`/`.m3u`: pon la URL directa del stream.
 - `favorites.txt`: tus favoritas (una URL por línea).
+- `history.txt`: el historial de canciones (las últimas 200; las guardadas con ♥ no se borran).
 - `config.ini`: las opciones.
 - `net.log`: registro de red. Si una emisora te falla, **mándamelo**. En Azahar está en *Archivo → Abrir carpeta de Azahar* → `sdmc/3ds/RadioNeon/`.
 
@@ -111,6 +114,7 @@ Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city
 - **Verified HTTPS** with the Mozilla root certificates bundled in the app.
 - **Never gives up:** if the stream or the Wi-Fi drops, it reconnects by itself. Meanwhile it shows the real reason (no Wi-Fi, server not responding, HTTP 404…) and a countdown to the next try.
 - **Favourites** (Y or tap the star) and **shuffle** (L or its button): NEXT jumps to a random station without repeating the last ones.
+- **Song history** (↓ or the middle button): songs that play for at least 30 s are added by themselves. **B** saves the one playing with a ♥ and a double beep. Every song has a QR code to look it up on Spotify from your phone.
 - **Sleep timer** (R or its button): 15, 30, 60, 90 minutes or any time you like; the radio fades out and stops by itself. With the lid closed, the console then goes to sleep.
 - **Oscilloscope and spectrum** of what is playing, with a beat detector, and a **volume bar** that follows the console's slider.
 - **Lid closed + headphones:** keeps playing with the screens off. Unplug the headphones and it stops; it never plays through the speakers with the lid closed.
@@ -140,11 +144,12 @@ You need a 3DS / 2DS / New 3DS with CFW (Luma3DS) and Wi-Fi set up.
 | Screen | Buttons |
 |---|---|
 | Everywhere | **START** exit (asks first) · **L / R** previous / next station (except on the main screen) |
-| Main | **A** play / stop · **Y** favourite · **X** menu · **SELECT** station list · **← / →** previous / next · **L** shuffle · **R** sleep timer |
+| Main | **A** play / stop · **Y** favourite · **X** menu · **SELECT** station list · **← / →** previous / next · **L** shuffle · **R** sleep timer · **↓** song history · **B** save the song that is playing |
 | Station list | **↑ / ↓** move · **← / →** page · **A** play · **Y** favourite · **B** back · **SELECT** reload `stations.txt` |
 | Menu | **↑ / ↓** · **A** open · **B** or **X** close |
 | Options | **↑ / ↓** · **← / →** or **A** change · **B** back |
 | Sleep timer | **↑ / ↓** · **A** choose · **B** back |
+| Song history | **↑ / ↓** move · **← / →** page · **Y** save / unsave ♥ · **B** back |
 | About | **B** back |
 
 Everything also works with the touch screen. Volume is the console's slider.
@@ -153,6 +158,7 @@ Everything also works with the touch screen. Volume is the console's slider.
 
 - `stations.txt`: one station per line as `Name | URL | Genre` (the genre is optional); `#` starts a comment. Delete it to get the default list back. Formats: MP3 and AAC/AAC+ (ADTS). Ogg/Opus, HLS (`.m3u8`) and `.pls`/`.m3u` playlists are not supported: use the direct stream URL.
 - `favorites.txt`: your favourites (one URL per line).
+- `history.txt`: the song history (the last 200; songs saved with ♥ are never dropped).
 - `config.ini`: the options.
 - `net.log`: network log. If a station fails, **send it to me**.
 
