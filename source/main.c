@@ -381,7 +381,7 @@ static void render_top(const PlayerInfo* pi) {
 
 /* --------------------------------------------------------------- bottom screen */
 typedef struct { float x, y, w, h, press; } Btn;
-static Btn B_CARD = { 10, 24, 300, 62, 0 }, B_CSTAR = { 226, 24, 30, 24, 0 };
+static Btn B_CARD = { 10, 24, 300, 62, 0 }, B_CSTAR = { 266, 24, 44, 62, 0 };   /* star: right column of the card */
 static Btn B_PREV = { 10, 98, 84, 82, 0 }, B_PLAY = { 104, 98, 112, 82, 0 }, B_NEXT = { 226, 98, 84, 82, 0 };
 static Btn B_MENU = { 10, 194, 146, 36, 0 }, B_EXIT = { 164, 194, 146, 36, 0 };
 static Btn B_BACK = { 8, 6, 76, 20, 0 };
@@ -499,19 +499,22 @@ static void render_controls(const PlayerInfo* pi) {
             else snprintf(fq, sizeof(fq), "%s", pi->codec);
         } else snprintf(fq, sizeof(fq), "%s", strncmp(g_stations[g_sel].url, "https", 5) ? "HTTP" : "HTTPS");
         mono_draw(fq, c->x + 70, c->y + 7, 1, COL_DIM, 0);
+        float rx = B_CSTAR.x;                 /* the star column starts here */
         if (live) {
-            ch_fill(c->x + c->w - 44, c->y + 5, 34, 11, 3, CUT_TL | CUT_BR, COL_RED);
-            mono_draw("LIVE", c->x + c->w - 27, c->y + 7, 1, COL_TEXT, 1);
+            ch_fill(rx - 44, c->y + 5, 34, 11, 3, CUT_TL | CUT_BR, COL_RED);
+            mono_draw("LIVE", rx - 27, c->y + 7, 1, COL_TEXT, 1);
         }
-        /* favourite star (touch) */
+        /* favourite: own column at the right of the card (touch) */
         bool f = fav_is(g_sel);
         float sp = 1 + B_CSTAR.press * 0.5f;
-        star(B_CSTAR.x + 15, B_CSTAR.y + 11, 6.5f * sp, f, f ? COL_ACC : COL_DIM);
+        C2D_DrawRectSolid(rx, c->y + 8, 0, 1, c->h - 16, COL_LINE);
+        star(rx + 22, c->y + 26, 9 * sp, f, f ? COL_ACC : COL_DIM);
+        mono_draw("FAV", rx + 22, c->y + 42, 1, f ? COL_ACC : COL_DIM, 1);
         const char* nm = g_stations[g_sel].name;
-        text_draw(nm, c->x + 12, c->y + 20, text_fit(nm, 0.7f, c->w - 24), COL_TEXT, 0);
+        text_draw(nm, c->x + 12, c->y + 20, text_fit(nm, 0.7f, rx - c->x - 24), COL_TEXT, 0);
         url_host(g_stations[g_sel].url, host, sizeof(host));
         mono_draw(host, c->x + 12, c->y + 48, 1, COL_DIM, 0);
-        lbl(T(S_CARD_LIST), c->x + c->w - 10, c->y + 48, 1, COL_ACC, 2);
+        lbl(T(S_CARD_LIST), rx - 10, c->y + 48, 1, COL_ACC, 2);
     }
     /* transport */
     hud_button(&B_PREV, CUT_TL | CUT_BL, false);

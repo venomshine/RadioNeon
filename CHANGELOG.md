@@ -14,6 +14,9 @@
 - Si se va la luz justo al guardar, `config.ini` y `favorites.txt` se recuperan de la copia `.tmp`.
 - Un nombre de emisora en Latin-1 en `stations.txt` ya no puede hacer leer memoria de más al animar el título.
 - Compila sin avisos.
+- Los créditos de «Acerca de» empiezan desde el principio cada vez que se abre.
+- El menú HOME muestra el nombre completo, «Radio Neon ラジオネオン».
+- La estrella de favorita tiene su propia columna en la tarjeta, con «FAV» debajo.
 
 ### Novedades
 - HTTPS con verificación de certificados (raíces de Mozilla).
