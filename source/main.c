@@ -491,10 +491,10 @@ static Btn B_DOK = { 44, 128, 112, 36, 0 }, B_DNO = { 164, 128, 112, 36, 0 }, B_
 #define MENU_Y 36
 #define MENU_H 46
 enum { MI_ALL, MI_FAV, MI_HIST, MI_SAVED, MI_OPT, MI_HELP, MI_ABOUT, MI_EXIT, NMENU };
-#define NOPT 6
-enum { OPT_ACCENT, OPT_LANG, OPT_LID, OPT_AUTO, OPT_SCAN, OPT_GLITCH };
-static const float OPT_Y[NOPT] = { 31, 74, 106, 138, 170, 202 };
-static const float OPT_H[NOPT] = { 41, 30, 30, 30, 30, 30 };
+#define NOPT 7
+enum { OPT_ACCENT, OPT_LANG, OPT_LID, OPT_SAVER, OPT_AUTO, OPT_SCAN, OPT_GLITCH };
+static const float OPT_Y[NOPT] = { 31, 74, 100, 126, 152, 178, 204 };
+static const float OPT_H[NOPT] = { 41, 26, 26, 26, 26, 26, 26 };
 #define NSLEEP 6
 static const int SLEEP_MIN[NSLEEP] = { 0, 15, 30, 60, 90, -1 };   /* -1 = custom (keyboard) */
 #define SLEEP_Y(i) (LIST_Y + 22 + (i) * 30)
@@ -859,7 +859,7 @@ static void render_options(void) {
     sub_header(T(S_HDR_OPT), "設定", "CONFIG.INI");
     dashed_vline(5, LIST_Y, SCR_H, 3, 3, COL_LINE);
     C2D_DrawRectSolid(4, g_selY + 7, 0, 3, OPT_H[g_optCur] - 14, COL_ACC);
-    static const StrId LABEL[NOPT] = { S_OPT_ACCENT, S_OPT_LANG, S_OPT_LID, S_OPT_AUTO, S_OPT_SCAN, S_OPT_GLITCH };
+    static const StrId LABEL[NOPT] = { S_OPT_ACCENT, S_OPT_LANG, S_OPT_LID, S_OPT_SAVER, S_OPT_AUTO, S_OPT_SCAN, S_OPT_GLITCH };
     bool hs = osIsHeadsetConnected();
     for (int i = 0; i < NOPT; i++) {
         float y = OPT_Y[i], h = OPT_H[i];
@@ -883,26 +883,27 @@ static void render_options(void) {
             continue;
         }
         if (i == OPT_LANG) {
-            lbl(T(S_OPTS_LANG), 22, y + 17, 1, sc, 0);
+            lbl(T(S_OPTS_LANG), 22, y + 15, 1, sc, 0);
             char v[48];
             if (g_cfg.lang == LANGSEL_SYSTEM) {
                 static const char* SYS[] = { "ES", "EN", "JA" };
                 snprintf(v, sizeof(v), "%s (%s)", T(S_LANG_SYSTEM), SYS[i18n_system_lang()]);
             } else snprintf(v, sizeof(v), "%s", lang_name(g_cfg.lang));
-            mono_draw("<", 220, y + 10, 1, COL_DIM, 0);
-            lbl(v, 262, y + 10, 1, COL_ACC, 1);
-            mono_draw(">", 304, y + 10, 1, COL_DIM, 2);
+            mono_draw("<", 220, y + 9, 1, COL_DIM, 0);
+            lbl(v, 262, y + 9, 1, COL_ACC, 1);
+            mono_draw(">", 304, y + 9, 1, COL_DIM, 2);
             continue;
         }
         bool on = false;
         switch (i) {
             case OPT_LID:     snprintf(sb, sizeof(sb), T(S_OPTS_LID), T(hs ? S_HS_YES : S_HS_NO)); on = g_cfg.lidPlay; break;
+            case OPT_SAVER:   snprintf(sb, sizeof(sb), "%s", T(S_OPTS_SAVER)); on = g_cfg.saver; break;
             case OPT_AUTO:    snprintf(sb, sizeof(sb), "%s", T(S_OPTS_AUTO)); on = g_cfg.autoplay; break;
             case OPT_SCAN:    snprintf(sb, sizeof(sb), "%s", T(S_OPTS_SCAN)); on = g_cfg.scanlines; break;
             default:          snprintf(sb, sizeof(sb), "%s", T(S_OPTS_GLITCH)); on = g_cfg.glitch; break;
         }
-        lbl(sb, 22, y + 17, 1, sc, 0);
-        hud_switch(256, y + 6, on);
+        lbl(sb, 22, y + 15, 1, sc, 0);
+        hud_switch(256, y + 5, on);
     }
 }
 
@@ -1574,6 +1575,7 @@ static void opt_change(int i, int dir) {
         case OPT_ACCENT:  g_cfg.accent = ((g_cfg.accent + dir) % NUM_ACCENTS + NUM_ACCENTS) % NUM_ACCENTS; config_apply_accent(); break;
         case OPT_LANG:    g_cfg.lang = ((g_cfg.lang + dir) % NUM_LANGSEL + NUM_LANGSEL) % NUM_LANGSEL; i18n_resolve(g_cfg.lang); break;
         case OPT_LID:     g_cfg.lidPlay = !g_cfg.lidPlay; break;
+        case OPT_SAVER:   g_cfg.saver = !g_cfg.saver; break;
         case OPT_AUTO:    g_cfg.autoplay = !g_cfg.autoplay; break;
         case OPT_SCAN:    g_cfg.scanlines = !g_cfg.scanlines; break;
         case OPT_GLITCH:  g_cfg.glitch = !g_cfg.glitch; break;
@@ -1911,12 +1913,15 @@ static void audio_up(const char* why) {
     g_resumeStation = -1;
 }
 
+static void saver_wake(void);
+static float g_lastInput;
+
 static void apt_cb(APT_HookType hook, void* param) {
     (void)param;
     switch (hook) {
-        case APTHOOK_ONSUSPEND: audio_down("home"); break;
-        case APTHOOK_ONRESTORE: audio_up("home"); break;
-        case APTHOOK_ONWAKEUP:  audio_down("wake"); audio_up("wake"); break;
+        case APTHOOK_ONSUSPEND: saver_wake(); audio_down("home"); break;   /* HOME with the screens off: light them first */
+        case APTHOOK_ONRESTORE: g_lastInput = g_t; audio_up("home"); break;
+        case APTHOOK_ONWAKEUP:  saver_wake(); audio_down("wake"); audio_up("wake"); break;
         default: break;
     }
 }
@@ -1928,6 +1933,40 @@ static void backlights(bool on) {
     if (on) GSPLCD_PowerOnAllBacklights();
     else    GSPLCD_PowerOffAllBacklights();
     gspLcdExit();
+}
+
+/* Battery saver (option): after SAVER_IDLE seconds without touching anything while a station plays, both
+ * screens go dark and nothing is drawn; the radio keeps going. Any button or a touch lights them again, and
+ * that press does nothing else. Never with the lid closed (that is power_update's job) or with a notice up. */
+#define SAVER_IDLE 20.0f
+static bool  g_saverOff = false;
+static float g_lastInput = 0;
+
+static void saver_wake(void) {
+    g_lastInput = g_t;
+    if (!g_saverOff) return;
+    backlights(true);
+    g_saverOff = false;
+    netlog("saver: screens on");
+}
+
+/* true while the screens are off: skip input and drawing this frame */
+static bool saver_update(const PlayerInfo* pi) {
+    bool touched = (hidKeysDown() | hidKeysHeld()) != 0;
+    bool active = g_playing >= 0 && pi->state != PS_STOPPED && pi->state != PS_ERROR;
+    bool notice = g_dialog || g_batDialog || g_batLock;
+    if (g_saverOff) {
+        if (touched || !g_cfg.saver || !active || notice) { saver_wake(); return true; }   /* the waking press is swallowed */
+        return true;
+    }
+    if (touched) g_lastInput = g_t;
+    else if (g_cfg.saver && active && !notice && g_t - g_lastInput > SAVER_IDLE) {
+        backlights(false);
+        g_saverOff = true;
+        netlog("saver: screens off, still playing");
+        return true;
+    }
+    return false;
 }
 
 static bool power_update(const PlayerInfo* pi) {
@@ -2157,7 +2196,8 @@ int main(int argc, char** argv) {
         vol_update();
         battery_warn();
         player_get_info(&pi);
-        if (power_update(&pi)) { gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
+        if (power_update(&pi)) { g_saverOff = false; g_lastInput = g_t; gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
+        if (saver_update(&pi)) { gspWaitForVBlank(); continue; }   /* battery saver: dark, audio only */
         handle_input(&pi);
         player_get_info(&pi);
         hist_track(&pi);
@@ -2194,7 +2234,7 @@ int main(int argc, char** argv) {
     g_cfg.station = g_playing >= 0 ? g_playing : g_sel;
     config_save();
     aptSetSleepAllowed(true);
-    if (g_lcdOff) backlights(true);
+    if (g_lcdOff || g_saverOff) backlights(true);
     aptUnhook(&g_aptCookie);
     web_stop();
     player_exit();

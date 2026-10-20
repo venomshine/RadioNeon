@@ -65,6 +65,8 @@ static const char* STR[S_COUNT][NUM_LANGS] = {
     [S_HS_NO]      = { "NO", "NO", "なし" },
     [S_OPTS_SCAN]  = { "LINEAS EN AMBAS PANTALLAS", "LINES ON BOTH SCREENS", "両画面にライン効果" },
     [S_OPTS_GLITCH]= { "AL CAMBIAR DE EMISORA + ALEATORIO", "ON STATION CHANGE + RANDOM", "局の切替時＋ランダム" },
+    [S_OPT_SAVER]  = { "Modo ahorro", "Battery saver", "省電力モード" },
+    [S_OPTS_SAVER] = { "PANTALLAS OFF TRAS 20 S // TOCA = ON", "SCREENS OFF AFTER 20 S // TOUCH = ON", "20秒で画面オフ // タッチで復帰" },
     [S_OPTS_AUTO]  = { "REPRODUCE AL INICIAR LA APP", "PLAYS WHEN THE APP STARTS", "起動時に自動再生" },
     [S_OPTS_LANG]  = { "SISTEMA = IDIOMA DE LA CONSOLA", "SYSTEM = CONSOLE LANGUAGE", "システム = 本体の言語" },
     [S_LANG_SYSTEM]= { "SISTEMA", "SYSTEM", "システム" },
