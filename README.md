@@ -8,14 +8,16 @@ Hecho por **VENOMSHiNE** · [Discord](https://discord.com/invite/yVKp8JwV4e) · 
 
 | | | |
 |:-:|:-:|:-:|
-| ![On air](docs/screenshots/02_on_air.png) | ![Station list](docs/screenshots/04_station_list.png) | ![Menu](docs/screenshots/05_menu.png) |
-| ON AIR | Station list / Lista | Menu / Menú |
-| ![Options](docs/screenshots/06_options.png) | ![About](docs/screenshots/08_about_qr.png) | ![Network retry](docs/screenshots/10_network_retry.png) |
+| ![On air](docs/screenshots/02_on_air.png) | ![Station list](docs/screenshots/03_station_list.png) | ![Song history](docs/screenshots/04_song_history.png) |
+| ON AIR | Station list / Lista | Song history + Spotify QR / Historial |
+| ![Phone page](docs/screenshots/05_phone_page.png) | ![Sleep timer](docs/screenshots/06_sleep_timer.png) | ![Low battery](docs/screenshots/11_low_battery.png) |
+| Phone page / Página del móvil | Sleep timer / Temporizador | Low battery / Batería baja |
+| ![Options](docs/screenshots/07_options.png) | ![About](docs/screenshots/08_about_qr.png) | ![Network retry](docs/screenshots/09_network_retry.png) |
 | Options / Opciones | About + QR / Acerca de | Network retry / Reintento |
-| ![Boot](docs/screenshots/01_boot_opendsp.png) | ![Red accent](docs/screenshots/11_accent_red.png) | ![UV accent](docs/screenshots/12_accent_uv.png) |
-| OpenDSP boot / Arranque | Red / Rojo | UV purple / Morado UV |
+| ![Boot](docs/screenshots/01_boot_opendsp.png) | ![Red accent](docs/screenshots/10_accent_red.png) | |
+| OpenDSP boot / Arranque | Red accent / Rojo | |
 
-<sub>Capturas de la 1.1.0 en Azahar con la interfaz en inglés · 1.1.0 screenshots in Azahar, English UI. Más / more: [docs/screenshots](docs/screenshots) · 1.0.0: [docs/screenshots-1.0.0](docs/screenshots-1.0.0)</sub>
+<sub>Capturas de la 1.1.0 en Azahar con la interfaz en inglés; el audio es una emisora de prueba local («Test Signal») · 1.1.0 screenshots in Azahar, English UI; the audio is a local test stream. Más / more: [docs/screenshots](docs/screenshots) · 1.0.0: [docs/screenshots-1.0.0](docs/screenshots-1.0.0)</sub>
 
 [Español](#español) · [English](#english)
 
@@ -23,7 +25,7 @@ Hecho por **VENOMSHiNE** · [Discord](https://discord.com/invite/yVKp8JwV4e) · 
 
 ## Español
 
-Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, city pop, clásica, FM locales y noticias. Tiene una estética HUD cyberpunk sobria, con fondo negro carbón y un solo color de acento a tu elección.
+Radio Neon convierte tu 3DS en una radio de música japonesa: J-POP, anime, city pop, eurobeat, J-rock, FM locales de Japón y mucho más. Tiene una estética HUD cyberpunk sobria, con fondo negro carbón y un solo color de acento a tu elección.
 
 ### Funciones
 
@@ -75,7 +77,7 @@ Todo se puede hacer también con la pantalla táctil. El volumen se controla con
 
 ### Archivos en la SD (`sdmc:/3ds/RadioNeon/`)
 
-- `stations.txt`: las emisoras, una por línea con el formato `Nombre | URL | Género` (el género es opcional); `#` es un comentario. Si lo borras, se vuelve a crear con la lista por defecto. Formatos: MP3 y AAC/AAC+ (ADTS). No se admiten Ogg/Opus, HLS (`.m3u8`) ni listas `.pls`/`.m3u`: pon la URL directa del stream.
+- `stations.txt`: las emisoras, una por línea con el formato `Nombre | URL | Género` (el género es opcional); `#` es un comentario. Si lo borras, se vuelve a crear con la lista por defecto; si era la lista de serie de una versión anterior y no la habías tocado, se actualiza sola y la vieja queda en `stations.old.txt`. Formatos: MP3 y AAC/AAC+ (ADTS). No se admiten Ogg/Opus, HLS (`.m3u8`) ni listas `.pls`/`.m3u`: pon la URL directa del stream.
 - `favorites.txt`: tus favoritas (una URL por línea).
 - `history.txt`: el historial de canciones (las últimas 200; las guardadas con ♥ no se borran).
 - `config.ini`: las opciones.
@@ -96,7 +98,7 @@ make                 # RadioNeon.3dsx
 ./build_cia.sh       # RadioNeon.cia (bannertool + makerom)
 ```
 
-Los gráficos del icono y del banner se generan con `tools/gen_art.py`. El sonido del HOME es `meta/banner_src.wav` (el original), convertido a `meta/banner.wav` (estéreo PCM16 a 32728 Hz) con `tools/banner_wav.py`.
+La página del móvil es `web/history.html`: después de cambiarla, `tools/build_web.sh` la comprueba y la deja comprimida en `romfs/web/history.html.gz`. Los gráficos del icono y del banner se generan con `tools/gen_art.py`. El sonido del HOME es `meta/banner_src.wav` (el original), convertido a `meta/banner.wav` (estéreo PCM16 a 32728 Hz) con `tools/banner_wav.py`.
 
 ### Licencia
 
@@ -106,7 +108,7 @@ Radio Neon está bajo la **Mozilla Public License 2.0** ([LICENSE](LICENSE)). En
 
 ## English
 
-Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city pop, classical, local FM and news. It has a clean cyberpunk HUD look, with a carbon-black background and a single accent colour of your choice.
+Radio Neon turns your 3DS into a radio for Japanese music: J-POP, anime, city pop, eurobeat, J-rock, local FM from Japan and much more. It has a clean cyberpunk HUD look, with a carbon-black background and a single accent colour of your choice.
 
 ### Features
 
@@ -158,7 +160,7 @@ Everything also works with the touch screen. Volume is the console's slider.
 
 ### Files on the SD card (`sdmc:/3ds/RadioNeon/`)
 
-- `stations.txt`: one station per line as `Name | URL | Genre` (the genre is optional); `#` starts a comment. Delete it to get the default list back. Formats: MP3 and AAC/AAC+ (ADTS). Ogg/Opus, HLS (`.m3u8`) and `.pls`/`.m3u` playlists are not supported: use the direct stream URL.
+- `stations.txt`: one station per line as `Name | URL | Genre` (the genre is optional); `#` starts a comment. Delete it to get the default list back; if it was an untouched built-in list from an older version, it is updated by itself and the old one is kept as `stations.old.txt`. Formats: MP3 and AAC/AAC+ (ADTS). Ogg/Opus, HLS (`.m3u8`) and `.pls`/`.m3u` playlists are not supported: use the direct stream URL.
 - `favorites.txt`: your favourites (one URL per line).
 - `history.txt`: the song history (the last 200; songs saved with ♥ are never dropped).
 - `config.ini`: the options.
@@ -179,7 +181,7 @@ make                 # RadioNeon.3dsx
 ./build_cia.sh       # RadioNeon.cia (bannertool + makerom)
 ```
 
-Icon and banner art: `tools/gen_art.py`; HOME menu sound: `meta/banner_src.wav` (original), converted to `meta/banner.wav` (stereo PCM16, 32728 Hz) by `tools/banner_wav.py`.
+The phone page is `web/history.html`: after editing it, `tools/build_web.sh` checks it and writes the compressed `romfs/web/history.html.gz`. Icon and banner art: `tools/gen_art.py`; HOME menu sound: `meta/banner_src.wav` (original), converted to `meta/banner.wav` (stereo PCM16, 32728 Hz) by `tools/banner_wav.py`.
 
 ### License
 

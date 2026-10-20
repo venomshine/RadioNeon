@@ -19,17 +19,17 @@
 - La estrella de favorita tiene su propia columna en la tarjeta, con «FAV» debajo.
 
 ### Novedades
+- **Historial de canciones** (↓ o el botón del centro), con una página para el móvil (QR, misma Wi-Fi o hotspot) con botones de Spotify, YouTube Music y Copiar, y QR de Spotify de cada canción. **B** guarda con ♥ la que suena, con un bip-bip al estilo del sonido del HOME.
+- **Aviso de batería baja**: bips cortos desde el 40 % y el 20 %, pausa con aviso al 10 %, y al 3 % la radio queda bloqueada con un cartel fijo hasta conectar el cargador.
+- **Temporizador de apagado** (botón o R): 15, 30, 60, 90 minutos o personalizado, con fundido de 10 s al final.
+- **Aleatorio** en la pantalla principal (botón o L): NEXT salta a una emisora al azar.
+- **Barra de volumen** en la pantalla de arriba: sigue al deslizador de la consola y muestra el % al moverlo.
+- Lista de emisoras renovada: más radios de Japón (FMかほく, WREP, Gotanno FM, Retro PC Game Music…), dos de eurobeat, FLY FM de city pop, J-Rock, Visual Kei y VocaloPlus!. Si tu `stations.txt` era la lista de serie sin cambios, se actualiza sola y la anterior queda en `stations.old.txt`.
+- Género de cada emisora en la lista y en favoritas (`Nombre | URL | Género` en `stations.txt`).
+- SELECT abre la lista de emisoras.
 - HTTPS con verificación de certificados (raíces de Mozilla).
 - La red se reintenta sola sin límite y muestra el motivo real y la cuenta atrás.
 - `net.log` en la SD para diagnosticar.
-- **Aleatorio** en la pantalla principal (botón o L): NEXT salta a una emisora al azar.
-- **Temporizador de apagado** (botón o R): 15, 30, 60, 90 minutos o personalizado, con fundido de 10 s al final.
-- SELECT abre la lista de emisoras.
-- **Historial de canciones** (↓ o el botón del centro), con una página para el móvil (QR, misma Wi-Fi o hotspot) con botones de Spotify, YouTube Music y Copiar, y QR de Spotify de cada canción. **B** guarda con ♥ la que suena, con un bip-bip al estilo del sonido del HOME.
-- Lista de emisoras renovada: más radios de Japón (FMかほく, WREP, Gotanno FM, Retro PC Game Music…), dos de eurobeat, FLY FM de city pop, J-Rock, Visual Kei y VocaloPlus!. Si tu `stations.txt` era la lista de serie sin cambios, se actualiza sola y la anterior queda en `stations.old.txt`.
-- Género de cada emisora en la lista y en favoritas (`Nombre | URL | Género` en `stations.txt`).
-- Aviso de batería baja: bips cortos desde el 40 % y el 20 %, pausa con aviso al 10 %, y al 3 % la radio queda bloqueada con un cartel fijo hasta conectar el cargador.
-- Barra de volumen en la pantalla de arriba: sigue al deslizador de la consola y muestra el % al moverlo.
 - Controles revisados: cada botón hace una sola cosa y solo donde tiene sentido.
 - «Acerca de» con QR de GitHub, Discord y Ko-fi y créditos que suben.
 - Datos reales en el HUD (servidor, HTTP/HTTPS, códec y bitrate, bytes reales del stream) en lugar de frecuencias inventadas.
@@ -39,6 +39,7 @@
 - Nombre definitivo **Radio Neon** (`RadioNeon.cia` / `.3dsx`, carpeta `sdmc:/3ds/RadioNeon`, migrada sola).
 - `config.ini` y `favorites.txt` se escriben de forma segura.
 - Licencia MPL-2.0.
+- Vocales mayúsculas con tilde (Á É Í Ó Ú) en la fuente del HUD, como ya tenía la Ñ.
 
 ## 1.0.0
 
