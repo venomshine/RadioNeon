@@ -90,7 +90,7 @@ make                 # RadioNeon.3dsx
 ./build_cia.sh       # RadioNeon.cia (bannertool + makerom)
 ```
 
-Los gráficos del icono y del banner se generan con `tools/gen_art.py`. El sonido del HOME es `meta/banner.wav`.
+Los gráficos del icono y del banner se generan con `tools/gen_art.py`. El sonido del HOME es `meta/banner_src.wav` (el original), convertido a `meta/banner.wav` (estéreo PCM16 a 32728 Hz) con `tools/banner_wav.py`.
 
 ### Licencia
 
@@ -167,7 +167,7 @@ make                 # RadioNeon.3dsx
 ./build_cia.sh       # RadioNeon.cia (bannertool + makerom)
 ```
 
-Icon and banner art: `tools/gen_art.py`; HOME menu sound: `meta/banner.wav`.
+Icon and banner art: `tools/gen_art.py`; HOME menu sound: `meta/banner_src.wav` (original), converted to `meta/banner.wav` (stereo PCM16, 32728 Hz) by `tools/banner_wav.py`.
 
 ### License
 

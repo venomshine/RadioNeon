@@ -1,4 +1,4 @@
-# Generates meta/icon.png (48x48) and meta/banner.png (256x128). The HOME menu sound is meta/banner.wav (original file, not generated)
+# Generates meta/icon.png (48x48) and meta/banner.png (256x128). The HOME menu sound is meta/banner_src.wav, converted by tools/banner_wav.py
 # Cyberpunk HUD style: carbon black, acid yellow #FCEE0A accent, small red alert.
 import math, struct, wave, random, sys
 from PIL import Image, ImageDraw, ImageFont
