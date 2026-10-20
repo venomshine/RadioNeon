@@ -10,7 +10,7 @@ BT=$T/bannertool; MR=$T/makerom
 [ -x "$MR" ] || MR=makerom
 mkdir -p build
 $BT makebanner -i meta/banner.png -a meta/banner.wav -o build/banner.bnr
-$BT makesmdh -s "Radio Neon" -l "Japanese internet radio / 日本のラジオ" -p "VENOMSHiNE" -i meta/icon.png -o build/icon.smdh
+$BT makesmdh -s "Radio Neon ラジオネオン" -l "Japanese internet radio / 日本のラジオ" -p "VENOMSHiNE" -i meta/icon.png -o build/icon.smdh
 $MR -f cia -o RadioNeon.cia -elf RadioNeon.elf -rsf meta/app.rsf -icon build/icon.smdh -banner build/banner.bnr \
     -exefslogo -target t -major $VER_MAJOR -minor $VER_MINOR -micro $VER_MICRO
 md5sum RadioNeon.cia RadioNeon.3dsx
