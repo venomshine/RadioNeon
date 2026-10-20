@@ -14,8 +14,10 @@ Hecho por **VENOMSHiNE** · [Discord](https://discord.com/invite/yVKp8JwV4e) · 
 | Phone page / Página del móvil | Sleep timer / Temporizador | Low battery / Batería baja |
 | ![Options](docs/screenshots/07_options.png) | ![About](docs/screenshots/08_about_qr.png) | ![Network retry](docs/screenshots/09_network_retry.png) |
 | Options / Opciones | About + QR / Acerca de | Network retry / Reintento |
-| ![Boot](docs/screenshots/01_boot_opendsp.png) | ![Red accent](docs/screenshots/10_accent_red.png) | |
-| OpenDSP boot / Arranque | Red accent / Rojo | |
+| ![Menu](docs/screenshots/12_menu.png) | ![Controls](docs/screenshots/13_controls.png) | ![Red accent](docs/screenshots/10_accent_red.png) |
+| Menu / Menú | Controls / Controles | Red accent / Rojo |
+| ![Boot](docs/screenshots/01_boot_opendsp.png) | | |
+| OpenDSP boot / Arranque | | |
 
 <sub>Capturas de la 1.1.0 en Azahar con la interfaz en inglés; el audio es una emisora de prueba local («Test Signal») · 1.1.0 screenshots in Azahar, English UI; the audio is a local test stream. Más / more: [docs/screenshots](docs/screenshots) · 1.0.0: [docs/screenshots-1.0.0](docs/screenshots-1.0.0)</sub>
 
@@ -29,16 +31,18 @@ Radio Neon convierte tu 3DS en una radio de música japonesa: J-POP, anime, city
 
 ### Funciones
 
-- **25 emisoras** listas para escuchar, con su género en la lista: J-POP, anime, Vocaloid, city pop, eurobeat, doujin, música de videojuegos retro, hip-hop, J-rock, visual kei, jazz, clásica, FM comunitarias japonesas y noticias. Puedes añadir las tuyas en `stations.txt`.
+- **25 emisoras** listas para escuchar, con su género en la lista: J-POP, anime, Vocaloid, city pop, eurobeat, doujin, música de videojuegos retro, hip-hop, J-rock, visual kei, house de Tokio, jazz, clásica, FM comunitarias japonesas y noticias. Puedes añadir las tuyas en `stations.txt`.
 - **MP3 y AAC / AAC+ (HE-AAC)** por `http://` y `https://`, con el título de la canción en directo (metadatos ICY, también en japonés).
 - **HTTPS verificado** con los certificados raíz de Mozilla incluidos en la app.
 - **Nunca se rinde:** si se corta la emisora o el Wi-Fi, vuelve a conectar sola. Mientras tanto te dice el motivo real (sin Wi-Fi, el servidor no responde, HTTP 404…) y cuánto falta para el siguiente intento.
 - **Favoritas** (Y o tocando la estrella) y **aleatorio** (L o su botón): NEXT salta a una emisora al azar sin repetir las últimas.
-- **Historial de canciones** (↓ o el botón del centro): se apuntan solas las que suenan al menos 30 s. **B** guarda con ♥ la que está sonando, con un bip-bip. Desde el historial, un QR abre en el móvil una página con todas las canciones y botones de Spotify, YouTube Music y Copiar (misma Wi-Fi o el hotspot del móvil; la página solo se puede ver, no toca nada de la consola). Con A, el QR pasa a ser la búsqueda en Spotify de la canción elegida.
+- **Historial de canciones** (X o el botón del centro): se apuntan solas las que suenan al menos 30 s. **B** guarda con ♥ la que está sonando, con un bip-bip (y otra vez B la quita). En el menú, **Guardadas** muestra solo las del ♥. Desde el historial, un QR abre en el móvil una página con todas las canciones y botones de Spotify, YouTube y Copiar (misma Wi-Fi o el hotspot del móvil; la página solo se puede ver, no toca nada de la consola). Con A, el QR pasa a ser la búsqueda en Spotify de la canción elegida.
 - **Aviso de batería baja**, sin molestar: un bip suave cada 5 % desde el 40 %, dos bips cada 2 % desde el 20 %, al 10 % la radio se pausa y te avisa, y al 3 % se bloquea con un cartel fijo hasta que conectes el cargador. Con el cargador puesto no suena nada.
 - **Temporizador de apagado** (R o su botón): 15, 30, 60, 90 minutos o los que quieras; la radio baja el volumen poco a poco y se para sola. Con la tapa cerrada, la consola se va a dormir.
 - **Osciloscopio y espectro** del audio que suena, con detector de ritmo, y **barra de volumen** que sigue al deslizador de la consola.
 - **Tapa cerrada + auriculares:** sigue sonando con las pantallas apagadas. Si quitas los auriculares, se para; nunca suena por los altavoces con la tapa cerrada.
+- **Modo ahorro** (opcional, en Opciones): con una emisora sonando, tras 20 s sin tocar nada se apagan las dos pantallas y la radio sigue. Cualquier botón o tocar la pantalla las enciende (esa pulsación no hace nada más).
+- **Controles** en el menú: la consola dibujada con lo que hace cada botón; si pulsas uno, se ilumina.
 - Pulsar **HOME**, cerrar la tapa y volver: la radio vuelve a conectar sola.
 - Siete colores de acento, scanlines, glitch RGB, y arranque con la última emisora.
 - Español, inglés y japonés (o el idioma de la consola).
@@ -64,13 +68,14 @@ Necesitas una 3DS / 2DS / New 3DS con CFW (Luma3DS) y Wi-Fi configurado.
 
 | Pantalla | Botones |
 |---|---|
-| En todas | **START** salir (pregunta antes) · **L / R** emisora anterior / siguiente (salvo en la principal) |
-| Principal | **A** reproducir / parar · **Y** favorita · **X** menú · **SELECT** lista de emisoras · **← / →** anterior / siguiente · **L** aleatorio · **R** temporizador · **↓** historial · **B** guardar la canción que suena |
-| Lista de emisoras | **↑ / ↓** moverse · **← / →** pasar página · **A** reproducir · **Y** favorita · **B** volver · **SELECT** recargar `stations.txt` |
-| Menú | **↑ / ↓** · **A** abrir · **B** o **X** cerrar |
+| En todas | **START** abre / cierra el menú · **START mantenido 2 s** salir (pregunta antes) · **X** abre / cierra el historial · **SELECT** abre / cierra la lista de emisoras · **L / R** emisora anterior / siguiente (salvo en la principal) |
+| Principal | **A** reproducir / parar · **Y** favorita · **← / →** anterior / siguiente · **L** aleatorio · **R** temporizador · **B** guardar / quitar la canción que suena |
+| Lista de emisoras | **↑ / ↓** moverse · **← / →** pasar página · **A** reproducir · **Y** favorita · **B** volver |
+| Menú | **↑ / ↓** · **A** abrir · **B** cerrar |
 | Opciones | **↑ / ↓** · **← / →** o **A** cambiar · **B** volver |
 | Temporizador | **↑ / ↓** · **A** elegir · **B** volver |
 | Historial | **↑ / ↓** moverse · **← / →** pasar página · **A** QR de Spotify de la canción · **Y** guardar / quitar ♥ · **B** volver |
+| Controles | cualquier botón se ilumina en el dibujo · **B** volver |
 | Acerca de | **B** volver |
 
 Todo se puede hacer también con la pantalla táctil. El volumen se controla con el deslizador de la consola.
@@ -112,16 +117,18 @@ Radio Neon turns your 3DS into a radio for Japanese music: J-POP, anime, city po
 
 ### Features
 
-- **25 stations** ready to play, with their genre in the list: J-POP, anime, Vocaloid, city pop, eurobeat, doujin, retro game music, hip-hop, J-rock, visual kei, jazz, classical, Japanese community FM and news. Add your own in `stations.txt`.
+- **25 stations** ready to play, with their genre in the list: J-POP, anime, Vocaloid, city pop, eurobeat, doujin, retro game music, hip-hop, J-rock, visual kei, Tokyo house, jazz, classical, Japanese community FM and news. Add your own in `stations.txt`.
 - **MP3 and AAC / AAC+ (HE-AAC)** over `http://` and `https://`, with the live song title (ICY metadata, Japanese included).
 - **Verified HTTPS** with the Mozilla root certificates bundled in the app.
 - **Never gives up:** if the stream or the Wi-Fi drops, it reconnects by itself. Meanwhile it shows the real reason (no Wi-Fi, server not responding, HTTP 404…) and a countdown to the next try.
 - **Favourites** (Y or tap the star) and **shuffle** (L or its button): NEXT jumps to a random station without repeating the last ones.
-- **Song history** (↓ or the middle button): songs that play for at least 30 s are added by themselves. **B** saves the one playing with a ♥ and a double beep. From the history, a QR code opens a page on your phone with every song and Spotify, YouTube Music and Copy buttons (same Wi-Fi or the phone's hotspot; the page is read only). With A, the QR code becomes the Spotify search for the selected song.
+- **Song history** (X or the middle button): songs that play for at least 30 s are added by themselves. **B** saves the one playing with a ♥ and a double beep (B again removes it). In the menu, **Saved songs** shows only the ♥ ones. From the history, a QR code opens a page on your phone with every song and Spotify, YouTube and Copy buttons (same Wi-Fi or the phone's hotspot; the page is read only). With A, the QR code becomes the Spotify search for the selected song.
 - **Low battery warning**, never intrusive: a soft beep every 5 % from 40 %, two beeps every 2 % from 20 %, at 10 % the radio pauses and tells you, and at 3 % it locks behind a fixed notice until you plug in the charger. Nothing while charging.
 - **Sleep timer** (R or its button): 15, 30, 60, 90 minutes or any time you like; the radio fades out and stops by itself. With the lid closed, the console then goes to sleep.
 - **Oscilloscope and spectrum** of what is playing, with a beat detector, and a **volume bar** that follows the console's slider.
 - **Lid closed + headphones:** keeps playing with the screens off. Unplug the headphones and it stops; it never plays through the speakers with the lid closed.
+- **Battery saver** (optional, in Options): while a station plays, after 20 s without touching anything both screens go dark and the radio keeps going. Any button or a touch lights them again (that press does nothing else).
+- **Controls** in the menu: the console drawn with what each button does; press one and it lights up.
 - Press **HOME**, or close the lid and come back: the radio reconnects by itself.
 - Seven accent colours, scanlines, RGB glitch, and start with the last station.
 - Spanish, English and Japanese (or the console language).
@@ -147,13 +154,14 @@ You need a 3DS / 2DS / New 3DS with CFW (Luma3DS) and Wi-Fi set up.
 
 | Screen | Buttons |
 |---|---|
-| Everywhere | **START** exit (asks first) · **L / R** previous / next station (except on the main screen) |
-| Main | **A** play / stop · **Y** favourite · **X** menu · **SELECT** station list · **← / →** previous / next · **L** shuffle · **R** sleep timer · **↓** song history · **B** save the song that is playing |
-| Station list | **↑ / ↓** move · **← / →** page · **A** play · **Y** favourite · **B** back · **SELECT** reload `stations.txt` |
-| Menu | **↑ / ↓** · **A** open · **B** or **X** close |
+| Everywhere | **START** opens / closes the menu · **hold START 2 s** exit (asks first) · **X** opens / closes the song history · **SELECT** opens / closes the station list · **L / R** previous / next station (except on the main screen) |
+| Main | **A** play / stop · **Y** favourite · **← / →** previous / next · **L** shuffle · **R** sleep timer · **B** save / unsave the song that is playing |
+| Station list | **↑ / ↓** move · **← / →** page · **A** play · **Y** favourite · **B** back |
+| Menu | **↑ / ↓** · **A** open · **B** close |
 | Options | **↑ / ↓** · **← / →** or **A** change · **B** back |
 | Sleep timer | **↑ / ↓** · **A** choose · **B** back |
 | Song history | **↑ / ↓** move · **← / →** page · **A** Spotify QR of the song · **Y** save / unsave ♥ · **B** back |
+| Controls | any button lights up in the drawing · **B** back |
 | About | **B** back |
 
 Everything also works with the touch screen. Volume is the console's slider.
