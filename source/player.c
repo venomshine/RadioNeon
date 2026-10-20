@@ -728,8 +728,9 @@ void player_set_ndsp(bool ok) {
  * ndsp channel so the station keeps playing. Generated once into linear memory. */
 #define SFX_CHN   1
 #define SFX_RATE  32728
-static s16* g_sfx[2];
-static int  g_sfxLen[2];
+#define NUM_SFX 5
+static s16* g_sfx[NUM_SFX];
+static int  g_sfxLen[NUM_SFX];
 static ndspWaveBuf g_sfxWb;
 
 static int sfx_tone(s16* out, int at, float hz, int ms, float amp) {
@@ -748,12 +749,24 @@ static int sfx_build(s16* out, int kind) {
         at = sfx_tone(out, at, 1470, 60, 0.22f);
         at = sfx_tone(out, at, 0, 30, 0);
         at = sfx_tone(out, at, 1954, 60, 0.22f);
-    } else at = sfx_tone(out, at, 876, 70, 0.18f);   /* removed: one low pip */
+    } else if (kind == 1) at = sfx_tone(out, at, 876, 70, 0.18f);   /* removed: one low pip */
+    else if (kind == 2) at = sfx_tone(out, at, 1954, 30, 0.10f);   /* battery 40 %: one soft pip */
+    else if (kind == 3) {                                          /* battery 20 %: two pips */
+        at = sfx_tone(out, at, 1954, 30, 0.16f);
+        at = sfx_tone(out, at, 0, 40, 0);
+        at = sfx_tone(out, at, 1954, 30, 0.16f);
+    } else {                                                       /* battery 10 %: three falling pips */
+        at = sfx_tone(out, at, 1954, 40, 0.22f);
+        at = sfx_tone(out, at, 0, 30, 0);
+        at = sfx_tone(out, at, 1470, 40, 0.22f);
+        at = sfx_tone(out, at, 0, 30, 0);
+        at = sfx_tone(out, at, 876, 70, 0.22f);
+    }
     return at;
 }
 
 void player_beep(int kind) {
-    if (kind < 0 || kind > 1) return;
+    if (kind < 0 || kind >= NUM_SFX) return;
     LightLock_Lock(&g_lock);
     if (!g_ndspOk) { LightLock_Unlock(&g_lock); return; }
     if (!g_sfx[kind]) {

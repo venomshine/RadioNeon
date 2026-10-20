@@ -33,6 +33,7 @@ Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, ci
 - **Nunca se rinde:** si se corta la emisora o el Wi-Fi, vuelve a conectar sola. Mientras tanto te dice el motivo real (sin Wi-Fi, el servidor no responde, HTTP 404…) y cuánto falta para el siguiente intento.
 - **Favoritas** (Y o tocando la estrella) y **aleatorio** (L o su botón): NEXT salta a una emisora al azar sin repetir las últimas.
 - **Historial de canciones** (↓ o el botón del centro): se apuntan solas las que suenan al menos 30 s. **B** guarda con ♥ la que está sonando, con un bip-bip. Cada canción tiene un QR para buscarla en Spotify desde el móvil.
+- **Aviso de batería baja**, sin molestar: un bip suave cada 5 % desde el 40 %, dos bips cada 2 % desde el 20 %, y al 10 % la radio se pausa y te avisa. Con el cargador puesto no suena nada.
 - **Temporizador de apagado** (R o su botón): 15, 30, 60, 90 minutos o los que quieras; la radio baja el volumen poco a poco y se para sola. Con la tapa cerrada, la consola se va a dormir.
 - **Osciloscopio y espectro** del audio que suena, con detector de ritmo, y **barra de volumen** que sigue al deslizador de la consola.
 - **Tapa cerrada + auriculares:** sigue sonando con las pantallas apagadas. Si quitas los auriculares, se para; nunca suena por los altavoces con la tapa cerrada.
@@ -115,6 +116,7 @@ Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city
 - **Never gives up:** if the stream or the Wi-Fi drops, it reconnects by itself. Meanwhile it shows the real reason (no Wi-Fi, server not responding, HTTP 404…) and a countdown to the next try.
 - **Favourites** (Y or tap the star) and **shuffle** (L or its button): NEXT jumps to a random station without repeating the last ones.
 - **Song history** (↓ or the middle button): songs that play for at least 30 s are added by themselves. **B** saves the one playing with a ♥ and a double beep. Every song has a QR code to look it up on Spotify from your phone.
+- **Low battery warning**, never intrusive: a soft beep every 5 % from 40 %, two beeps every 2 % from 20 %, and at 10 % the radio pauses and tells you. Nothing while charging.
 - **Sleep timer** (R or its button): 15, 30, 60, 90 minutes or any time you like; the radio fades out and stops by itself. With the lid closed, the console then goes to sleep.
 - **Oscilloscope and spectrum** of what is playing, with a beat detector, and a **volume bar** that follows the console's slider.
 - **Lid closed + headphones:** keeps playing with the screens off. Unplug the headphones and it stops; it never plays through the speakers with the lid closed.

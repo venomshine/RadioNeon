@@ -46,6 +46,8 @@ static int   g_hist[HIST_N], g_histN = 0;     /* shuffle history, so PREV goes b
 static int   g_menuCur = 0, g_optCur = 0;
 static bool  g_dialog = false;
 static float g_dialogT = -10;
+static bool  g_batDialog = false;          /* low battery notice (10 %) */
+static float g_batDialogT = -10;
 static bool  g_sleepBlocked = false, g_lcdOff = false;
 static int   g_resumeStation = -1;
 static bool  g_audioReady = false, g_audioDown = false;   /* hooks only act after boot, and up only after down */
@@ -479,7 +481,7 @@ static Btn B_SHUF = { 10, 93, 120, 19, 0 }, B_HIST = { 136, 93, 48, 19, 0 }, B_S
 static Btn B_PREV = { 10, 118, 84, 68, 0 }, B_PLAY = { 104, 118, 112, 68, 0 }, B_NEXT = { 226, 118, 84, 68, 0 };
 static Btn B_MENU = { 10, 194, 146, 36, 0 }, B_EXIT = { 164, 194, 146, 36, 0 };
 static Btn B_BACK = { 8, 6, 76, 20, 0 };
-static Btn B_DOK = { 44, 128, 112, 36, 0 }, B_DNO = { 164, 128, 112, 36, 0 };
+static Btn B_DOK = { 44, 128, 112, 36, 0 }, B_DNO = { 164, 128, 112, 36, 0 }, B_BOK = { 104, 128, 112, 36, 0 };
 #define ROW_H 30
 #define LIST_Y 32
 #define MENU_Y 36
@@ -554,26 +556,24 @@ static void icon_playstop(float cx, float cy, float m, u32 c) {
 
 /* 5 squares = 20 % each (1-20 % -> 1 ... 81-100 % -> 5); low under 15 %. Read every 5 s.
    Exact % from mcu::HWC; without it (some .3dsx launchers) the 0-5 level of ptm. */
-static int battery_squares(bool* charging, bool* low) {
+static int  g_batPct = -1;      /* 0-100, -1 = unknown */
+static bool g_batChg = false;
+
+static void battery_read(void) {
     static u64 last = 0;
-    static int sq = 5;
-    static bool chg = false, lo = false;
     u64 now = osGetTime();
-    if (!last || now - last > 5000) {
-        last = now;
-        u8 pct = 0, lv = 0, c = 0;
-        if (g_mcuOk && R_SUCCEEDED(MCUHWC_GetBatteryLevel(&pct))) {
-            if (pct > 100) pct = 100;
-            sq = (pct + 19) / 20;
-            lo = pct < 15;
-        } else if (R_SUCCEEDED(PTMU_GetBatteryLevel(&lv))) {
-            sq = lv > 5 ? 5 : lv;
-            lo = lv <= 1;
-        }
-        if (R_SUCCEEDED(PTMU_GetBatteryChargeState(&c))) chg = c != 0;
-    }
-    *charging = chg; *low = lo;
-    return sq;
+    if (last && now - last <= 5000) return;
+    last = now;
+    u8 pct = 0, lv = 0, c = 0;
+    if (g_mcuOk && R_SUCCEEDED(MCUHWC_GetBatteryLevel(&pct))) g_batPct = pct > 100 ? 100 : pct;
+    else if (R_SUCCEEDED(PTMU_GetBatteryLevel(&lv))) g_batPct = (lv > 5 ? 5 : lv) * 20;   /* coarse: 0-5 */
+    if (R_SUCCEEDED(PTMU_GetBatteryChargeState(&c))) g_batChg = c != 0;
+}
+
+static int battery_squares(bool* charging, bool* low) {
+    battery_read();
+    *charging = g_batChg; *low = g_batPct >= 0 && g_batPct < 15;
+    return g_batPct < 0 ? 5 : (g_batPct + 19) / 20;
 }
 
 static void bottom_header(const char* title) {
@@ -959,6 +959,27 @@ static void render_about(void) {
 }
 
 /* ---------------- exit confirmation dialog */
+static void render_bat_dialog(void) {
+    float k = ease_out_cubic((g_t - g_batDialogT) / 0.22f);
+    C2D_DrawRectSolid(0, 0, 0, BOT_W, SCR_H, C2D_Color32(0, 0, 0, (u8)(190 * k)));
+    float h = 120 * k, y = 120 - h / 2 + 2;
+    if (h < 4) return;
+    ch_fill(28, y, 264, h, 10, CUT_TL | CUT_BR, COL_BG);
+    ch_outline(28, y, 264, h, 10, CUT_TL | CUT_BR, COL_RED, 1);
+    brackets(22, y - 6, 276, h + 12, 8, col_a(COL_RED, 0.6f), 1);
+    if (k < 0.98f) return;
+    ch_fill(40, y + 10, 30, 12, 3, CUT_TL | CUT_BR, COL_RED);
+    mono_draw("!!", 55, y + 12, 1, COL_TEXT, 1);
+    mono_draw("SYS//POWER", 78, y + 12, 1, COL_DIM, 0);
+    char pc[16]; snprintf(pc, sizeof(pc), "%d%%", g_batPct < 0 ? 0 : g_batPct);
+    mono_draw(pc, 280, y + 12, 1, COL_RED, 2);
+    lbl(T(S_BAT_TITLE), 160, y + 30, 2, COL_TEXT, 1);
+    text_draw(T(S_BAT_MSG), 160, y + 50, text_fit(T(S_BAT_MSG), 0.5f, 250), COL_DIM, 1);
+    Btn* b = &B_BOK;
+    hud_button(b, CUT_TL | CUT_BR, true);
+    lbl(T(S_BAT_OK), b->x + b->w / 2, b->y + 14, 1, COL_BLACK, 1);
+}
+
 static void render_dialog(void) {
     float k = ease_out_cubic((g_t - g_dialogT) / 0.22f);
     C2D_DrawRectSolid(0, 0, 0, BOT_W, SCR_H, C2D_Color32(0, 0, 0, (u8)(190 * k)));
@@ -1155,6 +1176,7 @@ static void render_bottom(const PlayerInfo* pi) {
         default: render_about(); break;
     }
     if (g_dialog) render_dialog();
+    else if (g_batDialog) render_bat_dialog();
     /* lock-on reticle at touch point */
     for (int i = 0; i < 6; i++) {
         Lock* l = &g_lock[i];
@@ -1335,6 +1357,11 @@ static void handle_input(const PlayerInfo* pi) {
     hidTouchRead(&tp);
     int x = tp.px, y = tp.py;
 
+    /* low battery notice: one button, any of A / B / START / touch closes it */
+    if (g_batDialog) {
+        if ((kd & (KEY_A | KEY_B | KEY_START)) || ((kd & KEY_TOUCH) && hit(&B_BOK, x, y))) { B_BOK.press = 1; g_batDialog = false; }
+        return;
+    }
     /* modal exit dialog swallows everything */
     if (g_dialog) {
         if (kd & KEY_A) { B_DOK.press = 1; g_quit = true; }
@@ -1656,6 +1683,32 @@ static void hist_track(const PlayerInfo* pi) {
     }
 }
 
+/* low battery, never intrusive: one soft pip every 5 % from 40 % (40, 35, 30, 25), two pips every 2 %
+   from 20 % (20, 18, ... 12), and at 10 % three falling pips, the radio pauses and a notice says why.
+   Each level sounds once (no repeats if the reading wobbles); nothing while charging. Playing again after
+   the pause is the user's choice: it is not paused a second time. */
+static void battery_warn(void) {
+    static int warned = 101;   /* lowest level already warned */
+    battery_read();
+    if (g_batPct < 0) return;
+    if (g_batChg || g_batPct > warned + 4) { warned = 101; return; }   /* charged again: start over */
+    int p = g_batPct;
+    if (p <= 10) {
+        if (warned <= 10) return;
+        warned = 10;
+        player_beep(4);
+        netlog("battery: %d %% -> pause%s", p, g_playing >= 0 ? " (was playing)" : "");
+        if (g_playing >= 0) stop_station();
+        g_batDialog = true; g_batDialogT = g_t;
+    } else if (p <= 20) {
+        int step = 20 - ((20 - p) / 2) * 2;
+        if (step < warned) { warned = step; player_beep(3); netlog("battery: %d %%", p); }
+    } else if (p <= 40) {
+        int step = 40 - ((40 - p) / 5) * 5;
+        if (step < warned) { warned = step; player_beep(2); netlog("battery: %d %%", p); }
+    }
+}
+
 /* --------------------------------------------------------------- main */
 int main(int argc, char** argv) {
     osSetSpeedupEnable(true);
@@ -1701,6 +1754,7 @@ int main(int argc, char** argv) {
         hidScanInput();
         sleep_update();
         vol_update();
+        battery_warn();
         player_get_info(&pi);
         if (power_update(&pi)) { gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
         handle_input(&pi);
@@ -1709,8 +1763,8 @@ int main(int argc, char** argv) {
 
         float target = (pi.state == PS_STOPPED || pi.state == PS_ERROR) ? 0 : 1;
         g_morph += (target - g_morph) * 0.2f;
-        Btn* bs[] = { &B_PREV, &B_NEXT, &B_PLAY, &B_MENU, &B_EXIT, &B_CARD, &B_BACK, &B_CSTAR, &B_DOK, &B_DNO, &B_SHUF, &B_SLEEP, &B_HIST };
-        for (int i = 0; i < 13; i++) bs[i]->press *= 0.82f;
+        Btn* bs[] = { &B_PREV, &B_NEXT, &B_PLAY, &B_MENU, &B_EXIT, &B_CARD, &B_BACK, &B_CSTAR, &B_DOK, &B_DNO, &B_SHUF, &B_SLEEP, &B_HIST, &B_BOK };
+        for (int i = 0; i < 14; i++) bs[i]->press *= 0.82f;
 
         float nb[NBANDS];
         player_get_spectrum(nb, NBANDS);

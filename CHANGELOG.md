@@ -28,6 +28,7 @@
 - **Historial de canciones** (↓ o el botón del centro), con QR para buscar cada una en Spotify. **B** guarda con ♥ la que suena, con un bip-bip al estilo del sonido del HOME.
 - Lista de emisoras renovada: más radios de Japón (FMかほく, WREP, Gotanno FM, Retro PC Game Music…), dos de eurobeat, FLY FM de city pop, J-Rock, Visual Kei y VocaloPlus!. Si tu `stations.txt` era la lista de serie sin cambios, se actualiza sola y la anterior queda en `stations.old.txt`.
 - Género de cada emisora en la lista y en favoritas (`Nombre | URL | Género` en `stations.txt`).
+- Aviso de batería baja: bips cortos desde el 40 % y el 20 %, y pausa con aviso al 10 %.
 - Barra de volumen en la pantalla de arriba: sigue al deslizador de la consola y muestra el % al moverlo.
 - Controles revisados: cada botón hace una sola cosa y solo donde tiene sentido.
 - «Acerca de» con QR de GitHub, Discord y Ko-fi y créditos que suben.
