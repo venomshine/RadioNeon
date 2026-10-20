@@ -27,7 +27,7 @@ Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, ci
 
 ### Funciones
 
-- **20 emisoras japonesas** listas para escuchar. Puedes añadir las tuyas en `stations.txt`.
+- **20 emisoras japonesas** listas para escuchar, con su género en la lista (J-POP, ANIME, CITY POP, TALK…). Puedes añadir las tuyas en `stations.txt`.
 - **MP3 y AAC / AAC+ (HE-AAC)** por `http://` y `https://`, con el título de la canción en directo (metadatos ICY, también en japonés).
 - **HTTPS verificado** con los certificados raíz de Mozilla incluidos en la app.
 - **Nunca se rinde:** si se corta la emisora o el Wi-Fi, vuelve a conectar sola. Mientras tanto te dice el motivo real (sin Wi-Fi, el servidor no responde, HTTP 404…) y cuánto falta para el siguiente intento.
@@ -72,7 +72,7 @@ Todo se puede hacer también con la pantalla táctil. El volumen se controla con
 
 ### Archivos en la SD (`sdmc:/3ds/RadioNeon/`)
 
-- `stations.txt`: las emisoras, una por línea con el formato `Nombre | URL`; `#` es un comentario. Si lo borras, se vuelve a crear con la lista por defecto. Formatos: MP3 y AAC/AAC+ (ADTS). No se admiten Ogg/Opus, HLS (`.m3u8`) ni listas `.pls`/`.m3u`: pon la URL directa del stream.
+- `stations.txt`: las emisoras, una por línea con el formato `Nombre | URL | Género` (el género es opcional); `#` es un comentario. Si lo borras, se vuelve a crear con la lista por defecto. Formatos: MP3 y AAC/AAC+ (ADTS). No se admiten Ogg/Opus, HLS (`.m3u8`) ni listas `.pls`/`.m3u`: pon la URL directa del stream.
 - `favorites.txt`: tus favoritas (una URL por línea).
 - `config.ini`: las opciones.
 - `net.log`: registro de red. Si una emisora te falla, **mándamelo**. En Azahar está en *Archivo → Abrir carpeta de Azahar* → `sdmc/3ds/RadioNeon/`.
@@ -106,7 +106,7 @@ Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city
 
 ### Features
 
-- **20 Japanese stations** ready to play. Add your own in `stations.txt`.
+- **20 Japanese stations** ready to play, with their genre in the list (J-POP, ANIME, CITY POP, TALK…). Add your own in `stations.txt`.
 - **MP3 and AAC / AAC+ (HE-AAC)** over `http://` and `https://`, with the live song title (ICY metadata, Japanese included).
 - **Verified HTTPS** with the Mozilla root certificates bundled in the app.
 - **Never gives up:** if the stream or the Wi-Fi drops, it reconnects by itself. Meanwhile it shows the real reason (no Wi-Fi, server not responding, HTTP 404…) and a countdown to the next try.
@@ -151,7 +151,7 @@ Everything also works with the touch screen. Volume is the console's slider.
 
 ### Files on the SD card (`sdmc:/3ds/RadioNeon/`)
 
-- `stations.txt`: one station per line as `Name | URL`; `#` starts a comment. Delete it to get the default list back. Formats: MP3 and AAC/AAC+ (ADTS). Ogg/Opus, HLS (`.m3u8`) and `.pls`/`.m3u` playlists are not supported: use the direct stream URL.
+- `stations.txt`: one station per line as `Name | URL | Genre` (the genre is optional); `#` starts a comment. Delete it to get the default list back. Formats: MP3 and AAC/AAC+ (ADTS). Ogg/Opus, HLS (`.m3u8`) and `.pls`/`.m3u` playlists are not supported: use the direct stream URL.
 - `favorites.txt`: your favourites (one URL per line).
 - `config.ini`: the options.
 - `net.log`: network log. If a station fails, **send it to me**.

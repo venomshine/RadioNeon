@@ -707,15 +707,23 @@ static void render_list(const PlayerInfo* pi) {
         snprintf(num, sizeof(num), "%02d", i + 1);
         if (sel) { C2D_DrawRectSolid(16, y + 6, 0, 18, 13, COL_ACC); mono_draw(num, 25, y + 9, 1, COL_BLACK, 1); }
         else mono_draw(num, 25, y + 9, 1, COL_DIM, 1);
+        /* line 1: name + genre tag (right, next to the star); line 2: server + LIVE/LINK */
+        const char* gn = g_stations[i].genre;
+        float gw = gn[0] ? lbl_width(gn, 1) : 0, gx = 278 - gw;
+        if (gn[0]) {
+            ch_outline(gx - 4, y + 3, gw + 8, 12, 3, CUT_TL | CUT_BR, col_a(sel ? COL_ACC : COL_LINE, sel ? 0.7f : 1), 1);
+            lbl(gn, gx, y + 6, 1, col_a(sel ? COL_ACC : COL_DIM, sel ? 1 : 0.8f), 0);
+        }
         const char* nm = g_stations[i].name;
-        text_draw(nm, 40, y + 3, text_fit(nm, 0.5f, 192), sel ? COL_TEXT : col_a(COL_TEXT, 0.75f), 0);
+        float nmax = (gn[0] ? gx - 10 : 274) - 40;
+        text_draw(nm, 40, y + 3, text_fit(nm, 0.5f, nmax), sel ? COL_TEXT : col_a(COL_TEXT, 0.75f), 0);
         url_host(g_stations[i].url, host, sizeof(host));
         mono_draw(host, 40, y + 18, 1, col_a(COL_DIM, sel ? 1 : 0.6f), 0);
         if (play) {
             bool live = pi->state == PS_PLAYING;
-            ch_fill(240, y + 8, 34, 11, 3, CUT_TL | CUT_BR, live ? COL_RED : COL_CARBON);
-            if (!live) ch_outline(240, y + 8, 34, 11, 3, CUT_TL | CUT_BR, COL_ACC, 1);
-            mono_draw(live ? "LIVE" : "LINK", 257, y + 10, 1, live ? COL_TEXT : COL_ACC, 1);
+            ch_fill(244, y + 17, 34, 10, 3, CUT_TL | CUT_BR, live ? COL_RED : COL_CARBON);
+            if (!live) ch_outline(244, y + 17, 34, 10, 3, CUT_TL | CUT_BR, COL_ACC, 1);
+            mono_draw(live ? "LIVE" : "LINK", 261, y + 18, 1, live ? COL_TEXT : COL_ACC, 1);
         }
         bool f = fav_is(i);
         star(292, y + ROW_H / 2, 6, f, f ? COL_ACC : col_a(COL_DIM, sel ? 1 : 0.55f));

@@ -4,6 +4,7 @@
 typedef struct {
     char name[96];
     char url[384];
+    char genre[24];   /* optional third field; empty = no tag */
 } Station;
 
 extern Station g_stations[MAX_STATIONS];
