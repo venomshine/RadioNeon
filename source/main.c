@@ -271,7 +271,7 @@ static void draw_name(const PlayerInfo* pi, int idx) {
     } else {
         text_draw(buf, x, y, sc, COL_TEXT, 0);
     }
-    C2D_DrawRectSolid(30, 88.5f, 0, 340, 1, COL_LINE);
+    C2D_DrawRectSolid(30, 88, 0, 340, 1, COL_LINE);   /* whole pixel: a 1 px rect at .5 may vanish on the real GPU */
     if (g_t - g_savedT < 2) {   /* song just saved: in place of SIGNAL LOCK, same size, never over anything */
         u32 c = g_savedLike ? COL_ACC : COL_DIM;
         float w = lbl(T(g_savedLike ? S_SAVED : S_REMOVED), 370, 92, 1, c, 2);
@@ -957,12 +957,15 @@ static const Callout HELP_CO[] = {
 };
 #define NCO (int)(sizeof(HELP_CO) / sizeof(HELP_CO[0]))
 
+/* 1 px line moved half a pixel onto the pixel grid (see ch_outline) */
+static void line1(float x0, float y0, u32 c0, float x1, float y1, u32 c1) { C2D_DrawLine(x0 + 0.5f, y0 + 0.5f, c0, x1 + 0.5f, y1 + 0.5f, c1, 1, 0); }
+
 static float help_flash(int k) { float d = g_t - g_helpHit[k]; return g_helpHit[k] > 0 && d < 0.6f ? 1 - d / 0.6f : 0; }
 
 static void ring(float cx, float cy, float r, u32 c) {
     for (int i = 0; i < 20; i++) {
         float a0 = i * 6.2832f / 20, a1 = (i + 1) * 6.2832f / 20;
-        C2D_DrawLine(cx + cosf(a0) * r, cy + sinf(a0) * r, c, cx + cosf(a1) * r, cy + sinf(a1) * r, c, 1, 0);
+        line1(cx + cosf(a0) * r, cy + sinf(a0) * r, c, cx + cosf(a1) * r, cy + sinf(a1) * r, c);
     }
 }
 
@@ -991,14 +994,14 @@ static void help_console(void) {
     C2D_DrawRectSolid(bx + rr, by + bh - rr, 0, bw - 2 * rr, rr, bf);
     C2D_DrawCircleSolid(bx + rr, by + bh - rr, 0, rr, bf);
     C2D_DrawCircleSolid(bx + bw - rr, by + bh - rr, 0, rr, bf);
-    C2D_DrawLine(bx, by, COL_TEXT, bx + bw, by, COL_TEXT, 1, 0);
-    C2D_DrawLine(bx, by, COL_TEXT, bx, by + bh - rr, COL_TEXT, 1, 0);
-    C2D_DrawLine(bx + bw, by, COL_TEXT, bx + bw, by + bh - rr, COL_TEXT, 1, 0);
-    C2D_DrawLine(bx + rr, by + bh, COL_TEXT, bx + bw - rr, by + bh, COL_TEXT, 1, 0);
+    line1(bx, by, COL_TEXT, bx + bw, by, COL_TEXT);
+    line1(bx, by, COL_TEXT, bx, by + bh - rr, COL_TEXT);
+    line1(bx + bw, by, COL_TEXT, bx + bw, by + bh - rr, COL_TEXT);
+    line1(bx + rr, by + bh, COL_TEXT, bx + bw - rr, by + bh, COL_TEXT);
     for (int i = 0; i < 8; i++) {   /* the two quarter circles */
         float a0 = i * 1.5708f / 8, a1 = (i + 1) * 1.5708f / 8;
-        C2D_DrawLine(bx + rr - sinf(a0) * rr, by + bh - rr + cosf(a0) * rr, COL_TEXT, bx + rr - sinf(a1) * rr, by + bh - rr + cosf(a1) * rr, COL_TEXT, 1, 0);
-        C2D_DrawLine(bx + bw - rr + sinf(a0) * rr, by + bh - rr + cosf(a0) * rr, COL_TEXT, bx + bw - rr + sinf(a1) * rr, by + bh - rr + cosf(a1) * rr, COL_TEXT, 1, 0);
+        line1(bx + rr - sinf(a0) * rr, by + bh - rr + cosf(a0) * rr, COL_TEXT, bx + rr - sinf(a1) * rr, by + bh - rr + cosf(a1) * rr, COL_TEXT);
+        line1(bx + bw - rr + sinf(a0) * rr, by + bh - rr + cosf(a0) * rr, COL_TEXT, bx + bw - rr + sinf(a1) * rr, by + bh - rr + cosf(a1) * rr, COL_TEXT);
     }
     C2D_DrawRectSolid(114, 69, 0, 171, 1, body);   /* hinge bar */
     brackets(88, 56, 224, 132, 6, col_a(COL_ACC, 0.6f), 1);
@@ -1030,7 +1033,7 @@ static void help_console(void) {
     if (fd > 0) { C2D_DrawRectSolid(cx - a, cy - w, 0, a * 2, w * 2, col_a(COL_ACC, fd)); C2D_DrawRectSolid(cx - w, cy - a, 0, w * 2, a * 2, col_a(COL_ACC, fd)); }
     const float DX[] = { cx - w, cx + w, cx + w, cx + a, cx + a, cx + w, cx + w, cx - w, cx - w, cx - a, cx - a, cx - w, cx - w };
     const float DY[] = { cy - a, cy - a, cy - w, cy - w, cy + w, cy + w, cy + a, cy + a, cy + w, cy + w, cy - w, cy - w, cy - a };
-    for (int i = 0; i < 12; i++) C2D_DrawLine(DX[i], DY[i], dc, DX[i + 1], DY[i + 1], dc, 1, 0);
+    for (int i = 0; i < 12; i++) line1(DX[i], DY[i], dc, DX[i + 1], DY[i + 1], dc);
     /* right: C-stick, ABXY, START over SELECT */
     ring(273, 87, 4.5f, det);
     help_btn(284.5f, 99.5f, 5.5f, "X", HK_X);
@@ -1073,7 +1076,7 @@ static void render_top_help(void) {
             float x0 = c->px[k], y0 = c->py[k];
             float x1 = k + 1 < n ? c->px[k + 1] : c->lx, y1 = k + 1 < n ? c->py[k + 1] : c->ly;
             float sl = seg[k], u = sl > 0 ? (left < sl ? left / sl : 1) : 1;
-            C2D_DrawLine(x0, y0, lc, x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, lc, 1, 0);
+            line1(x0, y0, lc, x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, lc);
             left -= sl;
         }
         if (p < 1) continue;

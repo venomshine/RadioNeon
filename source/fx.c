@@ -49,12 +49,15 @@ void ch_fill(float x, float y, float w, float h, float cut, int k, u32 c) {
     }
 }
 
+/* A 1 px line centred on a whole coordinate lies exactly between two rows of pixels: the real 3DS GPU may
+   then draw neither (the emulator draws one), so a border disappears. Odd widths are moved half a pixel. */
 void ch_outline(float x, float y, float w, float h, float cut, int k, u32 c, float th) {
     float px[8], py[8];
     int n = ch_poly(x, y, w, h, cut, k, px, py);
+    float o = ((int)th & 1) ? 0.5f : 0;
     for (int i = 0; i < n; i++) {
         int j = (i + 1) % n;
-        C2D_DrawLine(px[i], py[i], c, px[j], py[j], c, th, 0);
+        C2D_DrawLine(px[i] + o, py[i] + o, c, px[j] + o, py[j] + o, c, th, 0);
     }
 }
 
