@@ -2125,7 +2125,7 @@ static void web_snapshot(const PlayerInfo* pi) {
     ver = g_songVer; liked = lk; snprintf(title, sizeof(title), "%s", t);
     if (!buf && !(buf = malloc(CAP))) return;
     size_t n = 0;
-    n += snprintf(buf + n, CAP - n, "{\"now\":");
+    n += snprintf(buf + n, CAP - n, "{\"ver\":\"" APP_VERSION "\",\"now\":");
     if (t[0] && g_playing >= 0) {
         n += snprintf(buf + n, CAP - n, "{\"t\":"); json_str(buf, CAP, &n, t);
         n += snprintf(buf + n, CAP - n, ",\"st\":"); json_str(buf, CAP, &n, g_stations[g_playing].name);
