@@ -3,7 +3,7 @@
 ## 1.1.0
 
 ### Arreglos
-- **HOME ya no cierra la app.** Antes de ir a HOME se apaga el audio y al volver se arranca de cero (OpenDSP no sobrevivía a la «reanudación» de libctru).
+- **HOME ya no congela la app.** La app tenía abierto todo el rato el servicio de las pantallas (`gsp::Lcd`) y el menú HOME se quedaba esperándolo; ahora solo se abre un momento para apagar o encender la luz. Además, antes de ir a HOME se apaga el audio y al volver se arranca de cero.
 - **Tras cerrar y abrir la tapa vuelve a sonar:** la red espera a que vuelva el Wi-Fi en vez de rendirse, y el audio se reinicia de cero.
 - **El sonido del menú HOME suena bien:** campana FM estéreo a 32728 Hz en lugar de pitidos de onda cuadrada.
 - La lista de emisoras tiene su propio cursor: moverse ya no cambia la emisora que se ve fuera.
