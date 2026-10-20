@@ -60,7 +60,7 @@ Necesitas una 3DS / 2DS / New 3DS con CFW (Luma3DS) y Wi-Fi configurado.
 | Pantalla | Botones |
 |---|---|
 | En todas | **START** salir (pregunta antes) · **L / R** emisora anterior / siguiente |
-| Principal | **A** reproducir / parar · **Y** favorita · **X** menú · **← / →** anterior / siguiente |
+| Principal | **A** reproducir / parar · **Y** favorita · **X** menú · **SELECT** lista de emisoras · **← / →** anterior / siguiente |
 | Lista de emisoras | **↑ / ↓** moverse · **← / →** pasar página · **A** reproducir · **Y** favorita · **B** volver · **SELECT** recargar `stations.txt` |
 | Menú | **↑ / ↓** · **A** abrir · **B** o **X** cerrar |
 | Opciones | **↑ / ↓** · **← / →** o **A** cambiar · **B** volver |
@@ -137,7 +137,7 @@ You need a 3DS / 2DS / New 3DS with CFW (Luma3DS) and Wi-Fi set up.
 | Screen | Buttons |
 |---|---|
 | Everywhere | **START** exit (asks first) · **L / R** previous / next station |
-| Main | **A** play / stop · **Y** favourite · **X** menu · **← / →** previous / next |
+| Main | **A** play / stop · **Y** favourite · **X** menu · **SELECT** station list · **← / →** previous / next |
 | Station list | **↑ / ↓** move · **← / →** page · **A** play · **Y** favourite · **B** back · **SELECT** reload `stations.txt` |
 | Menu | **↑ / ↓** · **A** open · **B** or **X** close |
 | Options | **↑ / ↓** · **← / →** or **A** change · **B** back |

@@ -987,6 +987,7 @@ static void handle_input(const PlayerInfo* pi) {
             if (kd & KEY_A) { if (idle) play_station(g_sel); else stop_station(); }
             if (kd & KEY_Y) toggle_fav(g_sel);
             if (kd & KEY_X) { g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); }
+            if (kd & KEY_SELECT) open_list(false, M_CTRL);
             if (horiz) step_station(horiz);
             break;
         case M_LIST:
