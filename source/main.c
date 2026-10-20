@@ -1126,7 +1126,7 @@ static void apt_cb(APT_HookType hook, void* param) {
 }
 
 /* gsp::Lcd only for a moment: the HOME Menu needs that service when it takes over, and if we keep a
- * session open it waits for it forever (frozen screen, only a forced power-off gets out). Same as ctrmus. */
+ * session open it waits for it forever (frozen screen, only a forced power-off gets out). Same as Cloud3DS. */
 static void backlights(bool on) {
     if (R_FAILED(gspLcdInit())) return;
     if (on) GSPLCD_PowerOnAllBacklights();
