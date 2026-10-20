@@ -23,7 +23,7 @@
 - **Historial de canciones** (X o el botón del centro), con una página para el móvil (QR, misma Wi-Fi o hotspot) con botones de Spotify, YouTube y Copiar, y QR de Spotify de cada canción. **B** guarda con ♥ la que suena, con un bip-bip al estilo del sonido del HOME («GUARDADA»), y otra vez B la quita («ELIMINADA»). La página tiene al pie GitHub, Discord, Ko-fi y la licencia.
 - **Menú con scroll**: Todas las emisoras, Favoritas, Historial, Guardadas (solo las del ♥), Opciones, Controles, Acerca de y Salir.
 - **Controles**: la consola (New 3DS XL) dibujada como un esquema, con una línea desde cada botón hasta lo que hace; si pulsas uno, se ilumina.
-- **Modo ahorro** (Opciones, apagado de serie): tras 20 s sin tocar nada con una emisora sonando se apagan las pantallas y la radio sigue; cualquier botón o tocar la pantalla las enciende.
+- **Modo ahorro** (Opciones, apagado de serie): tras 20 s sin tocar nada con una emisora sonando las pantallas se quedan en negro y la app deja de dibujar; la radio sigue. Cualquier botón o tocar la pantalla las devuelve.
 - **Aviso de batería baja**: bips cortos desde el 40 % y el 20 %, pausa con aviso al 10 %, y al 3 % la radio queda bloqueada con un cartel fijo hasta conectar el cargador.
 - **Temporizador de apagado** (botón o R): 15, 30, 60, 90 minutos o personalizado, con fundido de 10 s al final.
 - **Aleatorio** en la pantalla principal (botón o L): NEXT salta a una emisora al azar.

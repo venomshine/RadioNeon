@@ -41,7 +41,7 @@ Radio Neon convierte tu 3DS en una radio de música japonesa: J-POP, anime, city
 - **Temporizador de apagado** (R o su botón): 15, 30, 60, 90 minutos o los que quieras; la radio baja el volumen poco a poco y se para sola. Con la tapa cerrada, la consola se va a dormir.
 - **Osciloscopio y espectro** del audio que suena, con detector de ritmo, y **barra de volumen** que sigue al deslizador de la consola.
 - **Tapa cerrada + auriculares:** sigue sonando con las pantallas apagadas. Si quitas los auriculares, se para; nunca suena por los altavoces con la tapa cerrada.
-- **Modo ahorro** (opcional, en Opciones): con una emisora sonando, tras 20 s sin tocar nada se apagan las dos pantallas y la radio sigue. Cualquier botón o tocar la pantalla las enciende (esa pulsación no hace nada más).
+- **Modo ahorro** (opcional, en Opciones): con una emisora sonando, tras 20 s sin tocar nada las dos pantallas se quedan en negro y la app deja de dibujar; la radio sigue. Cualquier botón o tocar la pantalla las devuelve (esa pulsación no hace nada más). La luz de las pantallas no se toca.
 - **Controles** en el menú: la consola dibujada con lo que hace cada botón; si pulsas uno, se ilumina.
 - Pulsar **HOME**, cerrar la tapa y volver: la radio vuelve a conectar sola.
 - Siete colores de acento, scanlines, glitch RGB, y arranque con la última emisora.
@@ -127,7 +127,7 @@ Radio Neon turns your 3DS into a radio for Japanese music: J-POP, anime, city po
 - **Sleep timer** (R or its button): 15, 30, 60, 90 minutes or any time you like; the radio fades out and stops by itself. With the lid closed, the console then goes to sleep.
 - **Oscilloscope and spectrum** of what is playing, with a beat detector, and a **volume bar** that follows the console's slider.
 - **Lid closed + headphones:** keeps playing with the screens off. Unplug the headphones and it stops; it never plays through the speakers with the lid closed.
-- **Battery saver** (optional, in Options): while a station plays, after 20 s without touching anything both screens go dark and the radio keeps going. Any button or a touch lights them again (that press does nothing else).
+- **Battery saver** (optional, in Options): while a station plays, after 20 s without touching anything both screens go black and the app stops drawing; the radio keeps going. Any button or a touch brings them back (that press does nothing else). The backlight is left alone.
 - **Controls** in the menu: the console drawn with what each button does; press one and it lights up.
 - Press **HOME**, or close the lid and come back: the radio reconnects by itself.
 - Seven accent colours, scanlines, RGB glitch, and start with the last station.

@@ -1919,7 +1919,7 @@ static float g_lastInput;
 static void apt_cb(APT_HookType hook, void* param) {
     (void)param;
     switch (hook) {
-        case APTHOOK_ONSUSPEND: saver_wake(); audio_down("home"); break;   /* HOME with the screens off: light them first */
+        case APTHOOK_ONSUSPEND: saver_wake(); audio_down("home"); break;
         case APTHOOK_ONRESTORE: g_lastInput = g_t; audio_up("home"); break;
         case APTHOOK_ONWAKEUP:  saver_wake(); audio_down("wake"); audio_up("wake"); break;
         default: break;
@@ -1936,18 +1936,21 @@ static void backlights(bool on) {
 }
 
 /* Battery saver (option): after SAVER_IDLE seconds without touching anything while a station plays, both
- * screens go dark and nothing is drawn; the radio keeps going. Any button or a touch lights them again, and
- * that press does nothing else. Never with the lid closed (that is power_update's job) or with a notice up. */
+ * screens go black and nothing more is drawn (saves the CPU and GPU work); the radio keeps going. Any button
+ * or a touch brings them back, and that press does nothing else. Never with the lid closed (that is
+ * power_update's job) or with a notice up.
+ * The backlights are NOT switched off here: on a real New 3DS XL, GSPLCD_PowerOnAllBacklights did not light
+ * them again after GSPLCD_PowerOffAllBacklights (not even HOME did); only the lid brings them back. */
 #define SAVER_IDLE 20.0f
 static bool  g_saverOff = false;
+static bool  g_saverBlack = false;   /* the black frame still has to be drawn */
 static float g_lastInput = 0;
 
 static void saver_wake(void) {
     g_lastInput = g_t;
     if (!g_saverOff) return;
-    backlights(true);
     g_saverOff = false;
-    netlog("saver: screens on");
+    netlog("saver: screens back");
 }
 
 /* true while the screens are off: skip input and drawing this frame */
@@ -1961,9 +1964,9 @@ static bool saver_update(const PlayerInfo* pi) {
     }
     if (touched) g_lastInput = g_t;
     else if (g_cfg.saver && active && !notice && g_t - g_lastInput > SAVER_IDLE) {
-        backlights(false);
         g_saverOff = true;
-        netlog("saver: screens off, still playing");
+        g_saverBlack = true;
+        netlog("saver: screens black, still playing");
         return true;
     }
     return false;
@@ -2197,7 +2200,18 @@ int main(int argc, char** argv) {
         battery_warn();
         player_get_info(&pi);
         if (power_update(&pi)) { g_saverOff = false; g_lastInput = g_t; gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
-        if (saver_update(&pi)) { gspWaitForVBlank(); continue; }   /* battery saver: dark, audio only */
+        if (saver_update(&pi)) {   /* battery saver: one black frame, then nothing is drawn; audio only */
+            if (g_saverBlack) {
+                g_saverBlack = false;
+                C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
+                C2D_TargetClear(g_top, C2D_Color32(0, 0, 0, 255));
+                C2D_SceneBegin(g_top);
+                C2D_TargetClear(g_bot, C2D_Color32(0, 0, 0, 255));
+                C2D_SceneBegin(g_bot);
+                C3D_FrameEnd(0);
+            } else gspWaitForVBlank();
+            continue;
+        }
         handle_input(&pi);
         player_get_info(&pi);
         hist_track(&pi);
@@ -2234,7 +2248,7 @@ int main(int argc, char** argv) {
     g_cfg.station = g_playing >= 0 ? g_playing : g_sel;
     config_save();
     aptSetSleepAllowed(true);
-    if (g_lcdOff || g_saverOff) backlights(true);
+    if (g_lcdOff) backlights(true);
     aptUnhook(&g_aptCookie);
     web_stop();
     player_exit();
