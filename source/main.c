@@ -1441,6 +1441,10 @@ int main(int argc, char** argv) {
 
     stations_load();
     config_load();
+    {   /* the old built-in station list was replaced: keep pointing at the same station */
+        int st = stations_remap(g_cfg.station);
+        if (st != g_cfg.station) { g_cfg.station = st; config_save(); }
+    }
     i18n_resolve(g_cfg.lang);
     fav_load();
     if (g_cfg.station >= 0 && g_cfg.station < g_stationCount) g_sel = g_cfg.station;

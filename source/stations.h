@@ -13,3 +13,7 @@ extern int g_stationCount;
 /* Loads sdmc:/3ds/RadioNeon/stations.txt, creating it from the built-in list if missing.
    Returns number of stations. */
 int stations_load(void);
+
+/* After stations_load() replaced an untouched old built-in list: index in the old list -> index of the
+   same URL in the new one (0 if it is gone). Otherwise returns the index unchanged. */
+int stations_remap(int oldIndex);

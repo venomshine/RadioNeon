@@ -8,37 +8,67 @@
 
 #define DIR_PATH  APP_DIR
 #define FILE_PATH DIR_PATH "/stations.txt"
+#define OLD_LIST_PATH DIR_PATH "/stations.old.txt"
 #define SET_PATH  DIR_PATH "/settings.txt"
 
 Station g_stations[MAX_STATIONS];
 int g_stationCount = 0;
 
-/* Built-in list. Every URL below was verified to answer with real audio
-   (curl + ffprobe) when this build was made. Format: name | url | genre (genre optional) */
+/* Built-in list. Every URL below was checked to answer with real audio (curl + ffprobe) when this list
+   was made. Most are run from Japan; a few music streams from abroad complete the genres.
+   Format: name | url | genre (genre optional) */
 static const char* DEFAULT_LIST =
 "# Radio Neon / ラジオネオン - lista de emisoras\n"
 "# Formato:  Nombre | URL | Género   (una por línea, '#' = comentario; el género es opcional)\n"
 "# Soporta MP3 y AAC/AAC+ (ADTS) por http:// o https://\n"
 "LISTEN.moe J-POP | https://listen.moe/fallback | J-POP\n"
+"FMかほく 78.7 | http://radio.kahoku.net:8000/ | J-POP\n"
 "R/a/dio アニメ | https://relay0.r-a-d.io/main.mp3 | ANIME\n"
-"幻想郷ラジオ Gensokyo | https://stream.gensokyoradio.net/1/ | TOUHOU\n"
 "Stereo Anime | https://radio.stereoanime.com/listen/stereoanime/128 | ANIME\n"
-"Kawaii Anime Radio (AAC+) | http://158.69.227.214:8137/stream | ANIME\n"
-"JPopsuki Radio | http://65.21.170.149:8000/stream | J-POP\n"
+"幻想郷ラジオ Gensokyo | https://stream.gensokyoradio.net/1/ | TOUHOU\n"
+"Gotanno FM 89.2 同人 | https://radio.gotanno.love/ | DOUJIN\n"
+"Retro PC Game Music | http://gyusyabu.ddo.jp:8000/ | GAME\n"
 "City Pop One | http://65.21.61.215:8000/citypopone | CITY POP\n"
 "日本のシティポップ BOX | https://play.streamafrica.net/japancitypop | CITY POP\n"
-"Only Hits Japan | https://j.onlyhit.us/play | J-POP\n"
-"湘南ビーチFM 78.9 | https://shonanbeachfm.out.airtime.pro/shonanbeachfm_a | JAZZ\n"
-"FM世田谷 83.4 | https://fmsetagaya834.out.airtime.pro/fmsetagaya834_a | TALK\n"
-"OTTAVA クラシック | https://ottava2.out.airtime.pro/ottava2_a | CLASSICAL\n"
-"RadiCro レディクロ | https://radicrojapan.out.airtime.pro/radicrojapan_a | TALK\n"
-"Radio Hayama 葉山 | https://server10.reliastream.com/proxy/radiohayama\n"
-"羊飼いラジオ Hitsujikai | https://streaming.radio.co/se4a8e6a93/listen | TALK\n"
-"アシヤ・ラヂヲ (AAC) | https://s3.radio.co/sc8d895604/listen | BOSSA NOVA\n"
+"WREP ヒップホップ (AAC) | http://c13.radioboss.fm:8200/stream | HIP-HOP\n"
 "SOUND UP STATION NFRS | https://stream2.rcast.net/70945 | INDIE\n"
-"Fred Film Radio 日本語 | https://s10.webradio-hosting.com/proxy/fredradiojp/stream | TALK\n"
-"Replay News 日本語ニュース | https://replaynewsja.ice.infomaniak.ch/replaynewsja-128.mp3 | NEWS\n"
-"Nonstop Casiopea | https://nonstopcasiopea.radioca.st/ | FUSION\n";
+"Radio Hayama 葉山 | https://server10.reliastream.com/proxy/radiohayama | INDIE\n"
+"湘南ビーチFM 78.9 | https://shonanbeachfm.out.airtime.pro/shonanbeachfm_a | JAZZ\n"
+"Nonstop Casiopea | https://nonstopcasiopea.radioca.st/ | FUSION\n"
+"アシヤ・ラヂヲ (AAC) | https://s3.radio.co/sc8d895604/listen | BOSSA NOVA\n"
+"OTTAVA クラシック | https://ottava2.out.airtime.pro/ottava2_a | CLASSICAL\n"
+"FM世田谷 83.4 | https://fmsetagaya834.out.airtime.pro/fmsetagaya834_a | TALK\n"
+"RadiCro レディクロ | https://radicrojapan.out.airtime.pro/radicrojapan_a | TALK\n"
+"羊飼いラジオ Hitsujikai | https://streaming.radio.co/se4a8e6a93/listen | TALK\n"
+"Replay News 日本語ニュース | https://replaynewsja.ice.infomaniak.ch/replaynewsja-128.mp3 | NEWS\n";
+
+/* URLs of the list shipped with 1.0.0 and 1.1.0 (both the same). A stations.txt that is exactly that
+   list was never edited, so it is replaced by the new one (the old file is kept as stations.old.txt). */
+static const char* OLD_DEFAULT_URLS[] = {
+    "https://listen.moe/fallback",
+    "https://relay0.r-a-d.io/main.mp3",
+    "https://stream.gensokyoradio.net/1/",
+    "https://radio.stereoanime.com/listen/stereoanime/128",
+    "http://158.69.227.214:8137/stream",
+    "http://65.21.170.149:8000/stream",
+    "http://65.21.61.215:8000/citypopone",
+    "https://play.streamafrica.net/japancitypop",
+    "https://j.onlyhit.us/play",
+    "https://shonanbeachfm.out.airtime.pro/shonanbeachfm_a",
+    "https://fmsetagaya834.out.airtime.pro/fmsetagaya834_a",
+    "https://ottava2.out.airtime.pro/ottava2_a",
+    "https://radicrojapan.out.airtime.pro/radicrojapan_a",
+    "https://server10.reliastream.com/proxy/radiohayama",
+    "https://streaming.radio.co/se4a8e6a93/listen",
+    "https://s3.radio.co/sc8d895604/listen",
+    "https://stream2.rcast.net/70945",
+    "https://s10.webradio-hosting.com/proxy/fredradiojp/stream",
+    "https://replaynewsja.ice.infomaniak.ch/replaynewsja-128.mp3",
+    "https://nonstopcasiopea.radioca.st/",
+};
+#define NUM_OLD_DEFAULT (int)(sizeof(OLD_DEFAULT_URLS) / sizeof(OLD_DEFAULT_URLS[0]))
+static int g_replacedFrom[MAX_STATIONS];   /* old index -> OLD_DEFAULT_URLS index, while remapping */
+static bool g_replaced = false;
 
 static char* trim(char* s) {
     while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n') s++;
@@ -101,6 +131,8 @@ static void parse_list(const char* text) {
     }
 }
 
+static bool is_old_default(void);
+
 int stations_load(void) {
     mkdir("sdmc:/3ds", 0777);
     struct stat st;   /* 1.0.0 used sdmc:/3ds/radio3ds: move it once so nothing is lost */
@@ -125,6 +157,35 @@ int stations_load(void) {
     parse_list(buf);
     free(buf);
     if (g_stationCount == 0) parse_list(DEFAULT_LIST);
+    else if (is_old_default()) {
+        remove(OLD_LIST_PATH);
+        rename(FILE_PATH, OLD_LIST_PATH);
+        f = fopen(FILE_PATH, "wb");
+        if (f) { fputs(DEFAULT_LIST, f); fclose(f); }
+        parse_list(DEFAULT_LIST);
+        g_replaced = true;
+    }
     return g_stationCount;
+}
+
+/* the untouched old list: same number of stations and every URL one of the old built-in ones, each once */
+static bool is_old_default(void) {
+    if (g_stationCount != NUM_OLD_DEFAULT) return false;
+    bool used[NUM_OLD_DEFAULT] = { false };
+    for (int i = 0; i < g_stationCount; i++) {
+        int k = 0;
+        while (k < NUM_OLD_DEFAULT && (used[k] || strcmp(g_stations[i].url, OLD_DEFAULT_URLS[k]))) k++;
+        if (k == NUM_OLD_DEFAULT) return false;
+        used[k] = true;
+        g_replacedFrom[i] = k;
+    }
+    return true;
+}
+
+int stations_remap(int oldIndex) {
+    if (!g_replaced || oldIndex < 0 || oldIndex >= NUM_OLD_DEFAULT) return oldIndex;
+    const char* url = OLD_DEFAULT_URLS[g_replacedFrom[oldIndex]];
+    for (int i = 0; i < g_stationCount; i++) if (!strcmp(g_stations[i].url, url)) return i;
+    return 0;
 }
 

@@ -27,7 +27,7 @@ Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, ci
 
 ### Funciones
 
-- **20 emisoras japonesas** listas para escuchar, con su género en la lista (J-POP, ANIME, CITY POP, TALK…). Puedes añadir las tuyas en `stations.txt`.
+- **20 emisoras** listas para escuchar, con su género en la lista: J-POP, anime, city pop, doujin, música de videojuegos retro, hip-hop, jazz, clásica, FM comunitarias japonesas y noticias. Puedes añadir las tuyas en `stations.txt`.
 - **MP3 y AAC / AAC+ (HE-AAC)** por `http://` y `https://`, con el título de la canción en directo (metadatos ICY, también en japonés).
 - **HTTPS verificado** con los certificados raíz de Mozilla incluidos en la app.
 - **Nunca se rinde:** si se corta la emisora o el Wi-Fi, vuelve a conectar sola. Mientras tanto te dice el motivo real (sin Wi-Fi, el servidor no responde, HTTP 404…) y cuánto falta para el siguiente intento.
@@ -106,7 +106,7 @@ Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city
 
 ### Features
 
-- **20 Japanese stations** ready to play, with their genre in the list (J-POP, ANIME, CITY POP, TALK…). Add your own in `stations.txt`.
+- **20 stations** ready to play, with their genre in the list: J-POP, anime, city pop, doujin, retro game music, hip-hop, jazz, classical, Japanese community FM and news. Add your own in `stations.txt`.
 - **MP3 and AAC / AAC+ (HE-AAC)** over `http://` and `https://`, with the live song title (ICY metadata, Japanese included).
 - **Verified HTTPS** with the Mozilla root certificates bundled in the app.
 - **Never gives up:** if the stream or the Wi-Fi drops, it reconnects by itself. Meanwhile it shows the real reason (no Wi-Fi, server not responding, HTTP 404…) and a countdown to the next try.
