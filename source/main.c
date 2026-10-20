@@ -47,6 +47,8 @@ static int   g_hist[HIST_N], g_histN = 0;     /* shuffle history, so PREV goes b
 static int   g_menuCur = 0, g_optCur = 0;
 static bool  g_dialog = false;
 static float g_dialogT = -10;
+#define START_HOLD 2.0f            /* START held this long: exit dialog (a short press opens / closes the menu) */
+static float g_startDown = -1;     /* when START went down, -1 = not held */
 static bool  g_batDialog = false;          /* low battery notice (10 %) */
 static float g_batDialogT = -10;
 static bool  g_batLock = false;            /* 3 % and no charger: silent until the charger is plugged in */
@@ -268,10 +270,7 @@ static void draw_name(const PlayerInfo* pi, int idx) {
     } else {
         text_draw(buf, x, y, sc, COL_TEXT, 0);
     }
-    float w = text_width(name, sc);
-    if (w > 340) w = 340;
-    C2D_DrawRectSolid(30, 88, 0, w * ease_out_cubic(dt / 0.6f), 2, COL_ACC);
-    C2D_DrawRectSolid(30 + w + 4, 88.5f, 0, 370 - (30 + w + 4), 1, COL_LINE);
+    C2D_DrawRectSolid(30, 88.5f, 0, 340, 1, COL_LINE);
     if (g_t - g_savedT < 2) {   /* song just saved: in place of SIGNAL LOCK, same size, never over anything */
         float w = lbl(T(S_SAVED), 370, 92, 1, COL_ACC, 2);
         heart(370 - w - 9, 95.5f, 4.5f, true, COL_ACC);
@@ -1007,6 +1006,26 @@ static void render_bat_lock(void) {
     lbl(T(S_BTN_EXIT), 160, y + 146, 1, COL_DIM, 1);
 }
 
+/* START being held: the EXIT button fills up (or, away from the main panel, a strip at the bottom) */
+static void draw_start_hold(void) {
+    float held = g_startDown >= 0 ? g_t - g_startDown : 0;
+    if (held < 0.3f || g_dialog) return;
+    float k = (held - 0.3f) / (START_HOLD - 0.3f);
+    if (k > 1) k = 1;
+    if (g_mode == M_CTRL && !g_batLock) {
+        scissor_begin(false, B_EXIT.x, B_EXIT.y, B_EXIT.w * k, B_EXIT.h);
+        ch_fill(B_EXIT.x, B_EXIT.y, B_EXIT.w, B_EXIT.h, 8, CUT_TL | CUT_BR, COL_ACC);
+        lbl(T(S_BTN_EXIT), B_EXIT.x + B_EXIT.w / 2, B_EXIT.y + 14, 1, COL_BLACK, 1);
+        scissor_end();
+        return;
+    }
+    C2D_DrawRectSolid(0, SCR_H - 18, 0, BOT_W, 18, COL_BLACK);
+    C2D_DrawRectSolid(0, SCR_H - 18, 0, BOT_W, 1, COL_LINE);
+    C2D_DrawRectSolid(0, SCR_H - 18, 0, BOT_W * k, 18, col_a(COL_ACC, 0.25f));
+    C2D_DrawRectSolid(0, SCR_H - 2, 0, BOT_W * k, 2, COL_ACC);
+    lbl(T(S_BTN_EXIT), BOT_W / 2, SCR_H - 15, 1, COL_TEXT, 1);
+}
+
 static void render_dialog(void) {
     float k = ease_out_cubic((g_t - g_dialogT) / 0.22f);
     C2D_DrawRectSolid(0, 0, 0, BOT_W, SCR_H, C2D_Color32(0, 0, 0, (u8)(190 * k)));
@@ -1220,6 +1239,7 @@ static void render_bottom(const PlayerInfo* pi) {
     if (g_dialog) render_dialog();
     else if (g_batLock) render_bat_lock();
     else if (g_batDialog) render_bat_dialog();
+    draw_start_hold();
     /* lock-on reticle at touch point */
     for (int i = 0; i < 6; i++) {
         Lock* l = &g_lock[i];
@@ -1400,10 +1420,20 @@ static void handle_input(const PlayerInfo* pi) {
     hidTouchRead(&tp);
     int x = tp.px, y = tp.py;
 
+    /* START: a short press acts on release (menu), held START_HOLD seconds it asks to exit */
+    bool startTap = false;
+    if (kd & KEY_START) g_startDown = g_t;
+    if (g_startDown >= 0 && (kh & KEY_START) && g_t - g_startDown >= START_HOLD) {
+        g_startDown = -1;
+        if (!g_dialog) { g_batDialog = false; open_dialog(); }
+        return;
+    }
+    if (ku & KEY_START) { startTap = g_startDown >= 0 && g_t - g_startDown < 0.5f; g_startDown = -1; }   /* let go halfway: nothing */
+
     /* modal exit dialog swallows everything */
     if (g_dialog) {
         if (kd & KEY_A) { B_DOK.press = 1; g_quit = true; }
-        if (kd & (KEY_B | KEY_START)) { g_dialog = false; }
+        if ((kd & KEY_B) || startTap) { g_dialog = false; }
         if (kd & KEY_TOUCH) {
             if (hit(&B_DOK, x, y)) { press(&B_DOK, x, y); g_quit = true; }
             else if (hit(&B_DNO, x, y)) { press(&B_DNO, x, y); g_dialog = false; }
@@ -1412,26 +1442,30 @@ static void handle_input(const PlayerInfo* pi) {
     }
     /* battery lock (3 %): fixed notice, no button; only START (exit) still works */
     if (g_batLock) {
-        if (kd & KEY_START) open_dialog();
+        if (startTap) open_dialog();
         return;
     }
     /* low battery notice: one button, any of A / B / START / touch closes it */
     if (g_batDialog) {
-        if ((kd & (KEY_A | KEY_B | KEY_START)) || ((kd & KEY_TOUCH) && hit(&B_BOK, x, y))) { B_BOK.press = 1; g_batDialog = false; }
+        if ((kd & (KEY_A | KEY_B)) || startTap || ((kd & KEY_TOUCH) && hit(&B_BOK, x, y))) { B_BOK.press = 1; g_batDialog = false; }
         return;
     }
     /* Buttons (each one does one thing, only where it makes sense):
-     *   everywhere : START exit dialog · L / R previous / next station (or random with shuffle), except in CTRL
-     *   CTRL       : A play/stop · Y favourite · X menu · SELECT list · LEFT/RIGHT previous / next
+     *   everywhere : START menu (opens / closes) · START held exit dialog · X song history (opens / closes)
+     *                SELECT station list (opens / closes)
+     *                L / R previous / next station (or random with shuffle), except in CTRL
+     *   CTRL       : A play/stop · Y favourite · LEFT/RIGHT previous / next
      *                L shuffle on/off · R sleep timer (the chips under the card, same sides)
-     *                DOWN song history · B save / unsave the song that is playing
+     *                B save / unsave the song that is playing
      *   SLEEP      : UP/DOWN · A choose · B back
      *   HISTORY    : UP/DOWN move · LEFT/RIGHT page · Y save / unsave · B back
-     *   LIST       : UP/DOWN move · LEFT/RIGHT page · A play · Y favourite · B back · SELECT reload stations.txt
-     *   MENU       : UP/DOWN · A open · B or X close
+     *   LIST       : UP/DOWN move · LEFT/RIGHT page · A play · Y favourite · B back
+     *   MENU       : UP/DOWN · A open · B close
      *   OPTIONS    : UP/DOWN · LEFT/RIGHT or A change · B back
      *   ABOUT      : B back */
-    if (kd & KEY_START) { open_dialog(); return; }
+    if (startTap) { if (g_mode == M_MENU) set_mode(M_CTRL); else { g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); } return; }
+    if (kd & KEY_X) { if (g_mode == M_HIST) go_back(); else { B_HIST.press = 1; open_history(); } return; }
+    if (kd & KEY_SELECT) { if (g_mode == M_LIST) go_back(); else open_list(false, M_CTRL); return; }
     if (g_mode == M_CTRL) {
         if (kd & KEY_L) { B_SHUF.press = 1; toggle_shuffle(); }
         if (kd & KEY_R) { B_SLEEP.press = 1; open_sleep(); return; }
@@ -1453,21 +1487,13 @@ static void handle_input(const PlayerInfo* pi) {
         case M_CTRL:
             if (kd & KEY_A) { if (idle) play_station(g_sel); else stop_station(); }
             if (kd & KEY_Y) toggle_fav(g_sel);
-            if (kd & KEY_X) { g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); }
-            if (kd & KEY_SELECT) open_list(false, M_CTRL);
             if (kd & KEY_B) save_now_song(pi);
-            if (kd & (KEY_DDOWN | KEY_CPAD_DOWN)) { B_HIST.press = 1; open_history(); return; }
             if (horiz) step_station(horiz);
             break;
         case M_LIST:
             if ((kd & KEY_A) && g_viewN) play_station(g_view[g_cur]);
             if ((kd & KEY_Y) && g_viewN) toggle_fav(g_view[g_cur]);
             if (kd & KEY_B) go_back();
-            if (kd & KEY_SELECT) {
-                stop_station(); stations_load(); fav_load();
-                if (g_sel >= g_stationCount) g_sel = 0;
-                g_histN = 0; build_view(); list_sync_cursor(); g_changeT = g_t;
-            }
             if (vert && g_viewN) { g_cur = (g_cur + vert + g_viewN) % g_viewN; list_follow(); }
             if (horiz && g_viewN) {   /* page */
                 g_cur += horiz * 6;
@@ -1478,7 +1504,7 @@ static void handle_input(const PlayerInfo* pi) {
             break;
         case M_MENU:
             if (kd & KEY_A) menu_select(g_menuCur);
-            if (kd & (KEY_B | KEY_X)) set_mode(M_CTRL);
+            if (kd & KEY_B) set_mode(M_CTRL);
             if (vert) g_menuCur = (g_menuCur + vert + NMENU) % NMENU;
             break;
         case M_OPT:
