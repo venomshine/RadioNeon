@@ -48,6 +48,7 @@ static bool  g_dialog = false;
 static float g_dialogT = -10;
 static bool  g_batDialog = false;          /* low battery notice (10 %) */
 static float g_batDialogT = -10;
+static bool  g_batLock = false;            /* 3 % and no charger: silent until the charger is plugged in */
 static bool  g_sleepBlocked = false, g_lcdOff = false;
 static int   g_resumeStation = -1;
 static bool  g_audioReady = false, g_audioDown = false;   /* hooks only act after boot, and up only after down */
@@ -154,7 +155,7 @@ static void hud_switch(float x, float y, bool on) {
 
 /* --------------------------------------------------------------- actions */
 static void play_station(int i) {
-    if (!g_stationCount) return;
+    if (!g_stationCount || g_batLock) return;   /* battery lock: nothing plays, whatever asks for it */
     i = (i % g_stationCount + g_stationCount) % g_stationCount;
     g_sel = i; g_playing = i;
     player_play(g_stations[i].url);
@@ -302,13 +303,14 @@ static void net_message(const PlayerInfo* pi, char* out, size_t n) {
 static void draw_icy(const PlayerInfo* pi) {
     char line[300]; u32 lc = COL_TEXT;
     bool net = pi->netErr != NE_NONE && pi->state != PS_PLAYING && pi->state != PS_STOPPED;
-    if (net) { net_message(pi, line, sizeof(line)); lc = COL_RED; }
+    if (g_batLock) { snprintf(line, sizeof(line), "%s", T(S_BATL_NOW)); lc = COL_RED; }
+    else if (net) { net_message(pi, line, sizeof(line)); lc = COL_RED; }
     else if (pi->state == PS_ERROR) { tr_error(pi->error, line, sizeof(line)); lc = COL_RED; }
     else if (pi->title[0]) snprintf(line, sizeof(line), "%s", pi->title);
     else if (pi->state == PS_STOPPED) { snprintf(line, sizeof(line), "%s", T(S_IDLE)); lc = COL_DIM; }
     else if (pi->icyName[0]) snprintf(line, sizeof(line), "%s", pi->icyName);
     else { snprintf(line, sizeof(line), "%s", T(S_NO_ICY)); lc = COL_DIM; }
-    mono_draw(pi->state == PS_ERROR ? "ERR>" : net ? "NET>" : "NOW>", 30, 106, 1, pi->state == PS_ERROR || net ? COL_RED : COL_ACC, 0);
+    mono_draw(g_batLock ? "BAT>" : pi->state == PS_ERROR ? "ERR>" : net ? "NET>" : "NOW>", 30, 106, 1, g_batLock || pi->state == PS_ERROR || net ? COL_RED : COL_ACC, 0);
     float x0 = 60, x1 = 370;
     if (pi->title[0] && !net && pi->state != PS_ERROR) {   /* B saves the song that is playing */
         int k = now_song(pi);
@@ -980,6 +982,30 @@ static void render_bat_dialog(void) {
     lbl(T(S_BAT_OK), b->x + b->w / 2, b->y + 14, 1, COL_BLACK, 1);
 }
 
+/* battery lock: fixed card over the whole bottom screen, empty battery blinking */
+static void render_bat_lock(void) {
+    C2D_DrawRectSolid(0, 0, 0, BOT_W, SCR_H, C2D_Color32(0, 0, 0, 215));
+    float y = 34, h = 172;
+    ch_fill(20, y, 280, h, 10, CUT_TL | CUT_BR, COL_BG);
+    ch_outline(20, y, 280, h, 10, CUT_TL | CUT_BR, COL_RED, 1);
+    brackets(14, y - 6, 292, h + 12, 8, col_a(COL_RED, 0.6f), 1);
+    ch_fill(32, y + 10, 30, 12, 3, CUT_TL | CUT_BR, COL_RED);
+    mono_draw("!!", 47, y + 12, 1, COL_TEXT, 1);
+    mono_draw("SYS//POWER", 70, y + 12, 1, COL_DIM, 0);
+    char pc[16]; snprintf(pc, sizeof(pc), "%d%%", g_batPct < 0 ? 0 : g_batPct);
+    mono_draw(pc, 288, y + 12, 1, COL_RED, 2);
+    /* empty battery: outline, terminal and one red bar that blinks */
+    float bx = 136, by = y + 32;
+    C2D_DrawRectSolid(bx, by, 0, 44, 2, COL_RED); C2D_DrawRectSolid(bx, by + 20, 0, 44, 2, COL_RED);
+    C2D_DrawRectSolid(bx, by, 0, 2, 22, COL_RED); C2D_DrawRectSolid(bx + 42, by, 0, 2, 22, COL_RED);
+    C2D_DrawRectSolid(bx + 44, by + 6, 0, 4, 10, COL_RED);
+    if (fmodf(g_t, 1.0f) < 0.5f) C2D_DrawRectSolid(bx + 5, by + 5, 0, 6, 12, COL_RED);
+    lbl(T(S_BATL_TITLE), 160, y + 70, 2, COL_TEXT, 1);
+    text_draw(T(S_BATL_MSG1), 160, y + 92, text_fit(T(S_BATL_MSG1), 0.46f, 262), COL_DIM, 1);
+    text_draw(T(S_BATL_MSG2), 160, y + 110, text_fit(T(S_BATL_MSG2), 0.5f, 262), COL_TEXT, 1);
+    lbl(T(S_BTN_EXIT), 160, y + 146, 1, COL_DIM, 1);
+}
+
 static void render_dialog(void) {
     float k = ease_out_cubic((g_t - g_dialogT) / 0.22f);
     C2D_DrawRectSolid(0, 0, 0, BOT_W, SCR_H, C2D_Color32(0, 0, 0, (u8)(190 * k)));
@@ -1176,6 +1202,7 @@ static void render_bottom(const PlayerInfo* pi) {
         default: render_about(); break;
     }
     if (g_dialog) render_dialog();
+    else if (g_batLock) render_bat_lock();
     else if (g_batDialog) render_bat_dialog();
     /* lock-on reticle at touch point */
     for (int i = 0; i < 6; i++) {
@@ -1338,7 +1365,7 @@ static void toggle_song_like(int k) {
     if (k < 0 || k >= g_songCount) return;
     bool like = !g_songs[k].liked;
     hist_set_liked(k, like);
-    player_beep(like ? 0 : 1);
+    if (!g_batLock) player_beep(like ? 0 : 1);
 }
 
 static void to_menu(void) { g_selY = g_menuCur * MENU_H; g_selV = 0; set_mode(M_MENU); }
@@ -1357,11 +1384,6 @@ static void handle_input(const PlayerInfo* pi) {
     hidTouchRead(&tp);
     int x = tp.px, y = tp.py;
 
-    /* low battery notice: one button, any of A / B / START / touch closes it */
-    if (g_batDialog) {
-        if ((kd & (KEY_A | KEY_B | KEY_START)) || ((kd & KEY_TOUCH) && hit(&B_BOK, x, y))) { B_BOK.press = 1; g_batDialog = false; }
-        return;
-    }
     /* modal exit dialog swallows everything */
     if (g_dialog) {
         if (kd & KEY_A) { B_DOK.press = 1; g_quit = true; }
@@ -1370,6 +1392,16 @@ static void handle_input(const PlayerInfo* pi) {
             if (hit(&B_DOK, x, y)) { press(&B_DOK, x, y); g_quit = true; }
             else if (hit(&B_DNO, x, y)) { press(&B_DNO, x, y); g_dialog = false; }
         }
+        return;
+    }
+    /* battery lock (3 %): fixed notice, no button; only START (exit) still works */
+    if (g_batLock) {
+        if (kd & KEY_START) open_dialog();
+        return;
+    }
+    /* low battery notice: one button, any of A / B / START / touch closes it */
+    if (g_batDialog) {
+        if ((kd & (KEY_A | KEY_B | KEY_START)) || ((kd & KEY_TOUCH) && hit(&B_BOK, x, y))) { B_BOK.press = 1; g_batDialog = false; }
         return;
     }
     /* Buttons (each one does one thing, only where it makes sense):
@@ -1691,6 +1723,15 @@ static void battery_warn(void) {
     static int warned = 101;   /* lowest level already warned */
     battery_read();
     if (g_batPct < 0) return;
+    if (!g_batLock && !g_batChg && g_batPct <= 3) {
+        g_batLock = true; g_batDialog = false;
+        netlog("battery: %d %% -> locked until the charger is plugged in", g_batPct);
+        if (g_playing >= 0) stop_station();
+    } else if (g_batLock && (g_batChg || g_batPct >= 6)) {   /* 6 %: a reading that wobbles 3 <-> 4 does not unlock */
+        g_batLock = false;
+        netlog("battery: %d %%%s -> unlocked", g_batPct, g_batChg ? " charging" : "");
+    }
+    if (g_batLock) return;
     if (g_batChg || g_batPct > warned + 4) { warned = 101; return; }   /* charged again: start over */
     int p = g_batPct;
     if (p <= 10) {
