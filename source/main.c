@@ -37,7 +37,7 @@
 static C3D_RenderTarget *g_top, *g_bot;
 static float g_t;
 static int   g_sel = 0, g_playing = -1;   /* g_sel = current station (playing, or the last one played) */
-enum { M_CTRL = 0, M_LIST, M_MENU, M_OPT, M_ABOUT, M_SLEEP, M_HIST };
+enum { M_CTRL = 0, M_LIST, M_MENU, M_OPT, M_ABOUT, M_SLEEP, M_HIST, M_HELP };
 static int   g_mode = M_CTRL;
 static int   g_view[MAX_STATIONS], g_viewN = 0, g_cur = 0;   /* list view (all or favourites) */
 static bool  g_favView = false;
@@ -488,7 +488,7 @@ static Btn B_DOK = { 44, 128, 112, 36, 0 }, B_DNO = { 164, 128, 112, 36, 0 }, B_
 #define LIST_Y 32
 #define MENU_Y 36
 #define MENU_H 46
-enum { MI_ALL, MI_FAV, MI_HIST, MI_SAVED, MI_OPT, MI_ABOUT, MI_EXIT, NMENU };
+enum { MI_ALL, MI_FAV, MI_HIST, MI_SAVED, MI_OPT, MI_HELP, MI_ABOUT, MI_EXIT, NMENU };
 #define NOPT 6
 enum { OPT_ACCENT, OPT_LANG, OPT_LID, OPT_AUTO, OPT_SCAN, OPT_GLITCH };
 static const float OPT_Y[NOPT] = { 31, 74, 106, 138, 170, 202 };
@@ -792,8 +792,8 @@ static void render_list(const PlayerInfo* pi) {
 }
 
 /* ---------------- menu root */
-static const char* MENU_KANJI[NMENU] = { "放送局", "お気に入り", "履歴", "保存曲", "設定", "情報", "終了" };
-static const StrId MENU_LABEL[NMENU] = { S_MENU_ALL, S_MENU_FAV, S_MENU_HIST, S_MENU_SAVED, S_MENU_OPT, S_MENU_ABOUT, S_MENU_EXIT };
+static const char* MENU_KANJI[NMENU] = { "放送局", "お気に入り", "履歴", "保存曲", "設定", "操作", "情報", "終了" };
+static const StrId MENU_LABEL[NMENU] = { S_MENU_ALL, S_MENU_FAV, S_MENU_HIST, S_MENU_SAVED, S_MENU_OPT, S_MENU_HELP, S_MENU_ABOUT, S_MENU_EXIT };
 static float g_menuScroll = 0;
 static bool  g_menuFree = false;   /* dragged by touch: do not follow the cursor until a key moves it */
 #define MENU_VIS (SCR_H - MENU_Y)
@@ -831,6 +831,7 @@ static void render_menu(void) {
             case MI_HIST:  snprintf(sub, sizeof(sub), T(S_SUB_HIST), g_songCount); break;
             case MI_SAVED: snprintf(sub, sizeof(sub), T(S_SUB_SAVED), liked_count()); break;
             case MI_OPT:   snprintf(sub, sizeof(sub), T(S_SUB_OPT), acc_name(g_cfg.accent)); break;
+            case MI_HELP:  snprintf(sub, sizeof(sub), "%s", T(S_SUB_HELP)); break;
             case MI_ABOUT: snprintf(sub, sizeof(sub), "%s", T(S_SUB_ABOUT)); break;
             default:       snprintf(sub, sizeof(sub), "%s", T(S_SUB_EXIT)); break;
         }
@@ -929,6 +930,175 @@ static void draw_qr(const uint8_t* qr, float x, float y, int px) {
             C2D_DrawRectSolid(x + c0 * px, y + r * px, 0, (c - c0) * px, px, C2D_Color32(0, 0, 0, 255));
         }
     }
+}
+
+/* ---------------- controls: the lower half of the console drawn as a schematic (top screen),
+ * a line from each button to what it does on the main panel; the keys of the lists below (bottom screen).
+ * Pressing a real button lights it up in the drawing. */
+enum { HK_L, HK_R, HK_CPAD, HK_DPAD, HK_X, HK_Y, HK_A, HK_B, HK_START, HK_SELECT, HK_TOUCH, NHK };
+static float g_helpHit[NHK];   /* when each one was pressed (0 = never) */
+
+typedef struct { int key; const char* tag; StrId act, act2; int right; float lx, ly; int n; float px[4], py[4]; } Callout;
+/* path: from the button to the end of the underline (lx = the label's outer edge) */
+static const Callout HELP_CO[] = {
+    { HK_L,      "[L]",      S_H_L,      0, 0,   8,  52, 3, { 112, 112,  86 }, {  58,  52,  52 } },
+    { HK_CPAD,   "[O]",      S_H_CPAD,   0, 0,   8,  94, 2, { 112,  86 },      {  94,  94 } },
+    { HK_DPAD,   "[+]",      S_H_DPAD,   0, 0,   8, 142, 2, { 112,  86 },      { 142, 142 } },
+    { HK_Y,      "[Y]",      S_H_Y,      0, 0,   8, 200, 4, { 257, 252, 252,  86 }, { 104, 104, 200, 200 } },
+    { HK_SELECT, "[SELECT]", S_H_SELECT, 0, 0,   8, 226, 3, { 270, 270,  86 }, { 153, 226, 226 } },
+    { HK_R,      "[R]",      S_H_R,      0, 1, 392,  52, 3, { 288, 288, 314 }, {  58,  52,  52 } },
+    { HK_X,      "[X]",      S_H_X,      0, 1, 392,  80, 4, { 282, 302, 302, 314 }, {  91,  91,  80,  80 } },
+    { HK_A,      "[A]",      S_H_A,      0, 1, 392, 108, 4, { 295, 305, 305, 314 }, { 104, 104, 108, 108 } },
+    { HK_B,      "[B]",      S_H_B,      0, 1, 392, 136, 4, { 282, 308, 308, 314 }, { 117, 117, 136, 136 } },
+    { HK_START,  "[START]",  S_H_START, S_H_START2, 1, 392, 164, 4, { 293, 311, 311, 314 }, { 153, 153, 164, 164 } },
+};
+#define NCO (int)(sizeof(HELP_CO) / sizeof(HELP_CO[0]))
+
+static float help_flash(int k) { float d = g_t - g_helpHit[k]; return g_helpHit[k] > 0 && d < 0.6f ? 1 - d / 0.6f : 0; }
+
+static void ring(float cx, float cy, float r, u32 c) {
+    for (int i = 0; i < 20; i++) {
+        float a0 = i * 6.2832f / 20, a1 = (i + 1) * 6.2832f / 20;
+        C2D_DrawLine(cx + cosf(a0) * r, cy + sinf(a0) * r, c, cx + cosf(a1) * r, cy + sinf(a1) * r, c, 1, 0);
+    }
+}
+
+/* a round button: ring, letter, filled while lit */
+static void help_btn(float cx, float cy, float r, const char* letter, int key) {
+    float f = help_flash(key);
+    if (f > 0) C2D_DrawCircleSolid(cx, cy, 0, r, col_a(COL_ACC, f));
+    ring(cx, cy, r, f > 0 ? COL_ACC : COL_TEXT);
+    if (letter) mono_draw(letter, cx + 0.5f, cy - 3, 1, f > 0.5f ? COL_BLACK : COL_TEXT, 1);
+}
+
+/* small pill (START, SELECT, HOME) */
+static void help_pill(float cx, float cy, int key, u32 c) {
+    float f = key >= 0 ? help_flash(key) : 0;
+    if (f > 0) ch_fill(cx - 7, cy - 3, 14, 6, 2, CUT_TL | CUT_TR | CUT_BL | CUT_BR, col_a(COL_ACC, f));
+    ch_outline(cx - 7, cy - 3, 14, 6, 2, CUT_TL | CUT_TR | CUT_BL | CUT_BR, f > 0 ? COL_ACC : c, 1);
+}
+
+static void help_console(void) {
+    u32 body = COL_LINE, det = col_a(COL_TEXT, 0.85f);
+    /* shoulder buttons on the hinge corners */
+    float fl = help_flash(HK_L), fr = help_flash(HK_R);
+    if (fl > 0) { C2D_DrawRectSolid(98, 58, 0, 42, 6, col_a(COL_ACC, fl)); }
+    if (fr > 0) { C2D_DrawRectSolid(260, 58, 0, 42, 6, col_a(COL_ACC, fr)); }
+    C2D_DrawLine(92, 70, fl > 0 ? COL_ACC : det, 98, 58, fl > 0 ? COL_ACC : det, 1, 0);
+    C2D_DrawLine(98, 58, fl > 0 ? COL_ACC : det, 140, 58, fl > 0 ? COL_ACC : det, 1, 0);
+    C2D_DrawLine(308, 70, fr > 0 ? COL_ACC : det, 302, 58, fr > 0 ? COL_ACC : det, 1, 0);
+    C2D_DrawLine(302, 58, fr > 0 ? COL_ACC : det, 260, 58, fr > 0 ? COL_ACC : det, 1, 0);
+    C2D_DrawRectSolid(146, 60, 0, 108, 3, col_a(COL_LINE, 0.8f));   /* hinge */
+    /* body */
+    ch_fill(92, 64, 216, 126, 12, CUT_TL | CUT_TR | CUT_BL | CUT_BR, col_a(COL_PANEL, 0.9f));
+    ch_outline(92, 64, 216, 126, 12, CUT_TL | CUT_TR | CUT_BL | CUT_BR, COL_TEXT, 1);
+    brackets(88, 60, 224, 134, 6, col_a(COL_ACC, 0.6f), 1);
+    /* touch screen */
+    float ft = help_flash(HK_TOUCH);
+    ch_fill(152, 76, 96, 72, 4, CUT_TL | CUT_BR, ft > 0 ? col_a(COL_ACC, 0.25f + 0.5f * ft) : COL_CARBON);
+    ch_outline(152, 76, 96, 72, 4, CUT_TL | CUT_BR, ft > 0 ? COL_ACC : body, 1);
+    lbl(T(S_H_TOUCH), 200, 101, 1, COL_ACC, 1);
+    lbl(T(S_H_TOUCH2), 200, 113, 1, COL_DIM, 1);
+    /* left: circle pad and D-pad */
+    float fc = help_flash(HK_CPAD);
+    if (fc > 0) C2D_DrawCircleSolid(124, 94, 0, 11, col_a(COL_ACC, fc));
+    ring(124, 94, 11, fc > 0 ? COL_ACC : det);
+    ring(124, 94, 6, fc > 0 ? COL_ACC : body);
+    float fd = help_flash(HK_DPAD);
+    u32 dc = fd > 0 ? COL_ACC : det;
+    if (fd > 0) { C2D_DrawRectSolid(113, 138, 0, 22, 8, col_a(COL_ACC, fd)); C2D_DrawRectSolid(120, 131, 0, 8, 22, col_a(COL_ACC, fd)); }
+    static const float DX[] = { 120, 128, 128, 135, 135, 128, 128, 120, 120, 113, 113, 120, 120 };
+    static const float DY[] = { 131, 131, 138, 138, 146, 146, 153, 153, 146, 146, 138, 138, 131 };
+    for (int i = 0; i < 12; i++) C2D_DrawLine(DX[i], DY[i], dc, DX[i + 1], DY[i + 1], dc, 1, 0);
+    /* right: C-stick, ABXY, SELECT / START (New 3DS layout), HOME */
+    ring(256, 82, 3, body);
+    help_btn(276, 91, 6, "X", HK_X);
+    help_btn(263, 104, 6, "Y", HK_Y);
+    help_btn(289, 104, 6, "A", HK_A);
+    help_btn(276, 117, 6, "B", HK_B);
+    help_pill(270, 150, HK_SELECT, det);
+    help_pill(289, 150, HK_START, det);
+    help_pill(200, 170, -1, body);
+    mono_draw("HOME", 200, 177, 1, col_a(COL_DIM, 0.6f), 1);
+}
+
+static void render_top_help(void) {
+    C2D_DrawRectSolid(0, 0, 0, TOP_W, SCR_H, COL_BG);
+    dot_matrix(TOP_W);
+    ch_outline(4, 4, 392, 232, 10, CUT_TL | CUT_BR, COL_LINE, 1);
+    C2D_DrawLine(4, 14, COL_ACC, 14, 4, COL_ACC, 2, 0);
+    C2D_DrawLine(386, 236, COL_ACC, 396, 226, COL_ACC, 2, 0);
+    mono_draw("RADIO//NEON", 18, 10, 1, COL_ACC, 0);
+    mono_draw("CONTROLS // CTRL PANEL", 88, 10, 1, COL_DIM, 0);
+    C2D_DrawRectSolid(14, 24, 0, 372, 1, COL_LINE);
+    C2D_DrawRectSolid(14, 24, 0, 30, 1, COL_ACC);
+    help_console();
+    float t = g_t - g_modeT;
+    for (int i = 0; i < NCO; i++) {
+        const Callout* c = &HELP_CO[i];
+        float p = (t - 0.15f - i * 0.04f) / 0.3f;
+        if (p <= 0) continue;
+        if (p > 1) p = 1;
+        float f = help_flash(c->key);
+        u32 lc = f > 0 ? COL_ACC : col_a(COL_ACC, 0.55f);
+        /* the line grows from the button: path segments, then the underline under the label */
+        float len = 0, seg[5];
+        int n = c->n;
+        for (int k = 0; k + 1 < n; k++) { seg[k] = fabsf(c->px[k + 1] - c->px[k]) + fabsf(c->py[k + 1] - c->py[k]); len += seg[k]; }
+        float ul = fabsf(c->lx - c->px[n - 1]);
+        seg[n - 1] = ul; len += ul;
+        float left = len * ease_out_cubic(p);
+        C2D_DrawCircleSolid(c->px[0], c->py[0], 0, 1.5f, lc);
+        for (int k = 0; k < n && left > 0; k++) {
+            float x0 = c->px[k], y0 = c->py[k];
+            float x1 = k + 1 < n ? c->px[k + 1] : c->lx, y1 = k + 1 < n ? c->py[k + 1] : c->ly;
+            float sl = seg[k], u = sl > 0 ? (left < sl ? left / sl : 1) : 1;
+            C2D_DrawLine(x0, y0, lc, x0 + (x1 - x0) * u, y0 + (y1 - y0) * u, lc, 1, 0);
+            left -= sl;
+        }
+        if (p < 1) continue;
+        float tx = c->right ? c->lx - 76 : c->lx + 2;
+        if (f > 0) C2D_DrawRectSolid(c->right ? c->lx - 78 : c->lx, c->ly - 20, 0, 78, 20, col_a(COL_ACC, 0.18f * f + 0.05f));
+        mono_draw(c->tag, tx, c->ly - 19, 1, COL_ACC, 0);
+        float d = t - 0.45f - i * 0.04f;
+        char buf[64];
+        const char* act = T(c->act);
+        if (d < 0.3f && mono_ok(act)) { hyper_text(act, d / 0.3f, buf, sizeof(buf), (unsigned)(g_t * 40) + i); act = buf; }
+        lbl(act, tx, c->ly - 10, 1, f > 0 ? COL_ACC : COL_TEXT, 0);
+        if (c->act2) lbl(T(c->act2), tx, c->ly + 3, 1, COL_DIM, 0);
+    }
+    scanlines(TOP_W);
+}
+
+/* bottom screen: the keys of the lists and the history, and touch */
+static void help_row(const char* key, StrId what, float y) {
+    lbl(key, 62, y, 1, COL_ACC, 2);
+    lbl(T(what), 72, y, 1, COL_TEXT, 0);
+}
+
+static void render_help(void) {
+    sub_header(T(S_HDR_HELP), "操作", "");
+    dashed_vline(5, LIST_Y, SCR_H, 3, 3, COL_LINE);
+    float y = LIST_Y + 8;
+    mono_draw("//", 14, y, 1, COL_ACC, 0);
+    lbl(T(S_H_SEC_LISTS), 28, y, 1, COL_DIM, 0);
+    C2D_DrawRectSolid(14, y + 11, 0, 292, 1, COL_LINE);
+    y += 20;
+    help_row("↑ ↓", S_H_MOVE, y); y += 15;
+    help_row("← →", S_H_PAGE, y); y += 15;
+    help_row("A", S_H_PLAY, y); y += 15;
+    help_row("Y", S_H_MARK, y); y += 15;
+    help_row("B", S_H_BACK, y); y += 15;
+    help_row("L  R", S_H_LR, y); y += 22;
+    mono_draw("//", 14, y, 1, COL_ACC, 0);
+    lbl(T(S_H_SEC_TOUCH), 28, y, 1, COL_DIM, 0);
+    C2D_DrawRectSolid(14, y + 11, 0, 292, 1, COL_LINE);
+    y += 20;
+    help_row(">", S_H_DRAG, y); y += 15;
+    help_row(">", S_H_TAP, y);
+    float pulse = 0.55f + 0.45f * sinf(g_t * 3);
+    ch_outline(14, 212, 292, 20, 5, CUT_TL | CUT_BR, col_a(COL_ACC, 0.4f), 1);
+    lbl(T(S_H_PRESS), 160, 219, 1, col_a(COL_ACC, pulse), 1);
 }
 
 static void render_about(void) {
@@ -1275,6 +1445,7 @@ static void render_bottom(const PlayerInfo* pi) {
             } else render_history();
             break;
         }
+        case M_HELP: render_help(); break;
         default: render_about(); break;
     }
     if (g_dialog) render_dialog();
@@ -1373,6 +1544,7 @@ static void menu_select(int i) {
         case MI_HIST:  open_history(false, M_MENU); break;
         case MI_SAVED: open_history(true, M_MENU); break;
         case MI_OPT:   g_optCur = 0; g_selY = OPT_Y[0]; g_selV = 0; set_mode(M_OPT); break;
+        case MI_HELP:  memset(g_helpHit, 0, sizeof(g_helpHit)); set_mode(M_HELP); break;
         case MI_ABOUT: set_mode(M_ABOUT); break;
         default:       open_dialog(); break;
     }
@@ -1459,9 +1631,22 @@ static void to_menu(void) { g_selY = g_menuCur * MENU_H; g_selV = 0; set_mode(M_
 
 static void go_back(void) {
     if (g_mode == M_LIST) { if (g_listFrom == M_MENU) to_menu(); else set_mode(M_CTRL); }
-    else if (g_mode == M_OPT || g_mode == M_ABOUT) to_menu();
+    else if (g_mode == M_OPT || g_mode == M_ABOUT || g_mode == M_HELP) to_menu();
     else if (g_mode == M_HIST && g_histFrom == M_MENU) to_menu();
     else if (g_mode == M_MENU || g_mode == M_SLEEP || g_mode == M_HIST) set_mode(M_CTRL);
+}
+
+/* keys while the controls are shown: they only light up (B or BACK leave, START held still exits) */
+static void help_input(u32 kd, bool startTap, int x, int y) {
+    static const u32 MAP[NHK] = { KEY_L, KEY_R, KEY_CPAD_UP | KEY_CPAD_DOWN | KEY_CPAD_LEFT | KEY_CPAD_RIGHT,
+                                  KEY_DUP | KEY_DDOWN | KEY_DLEFT | KEY_DRIGHT, KEY_X, KEY_Y, KEY_A, 0, KEY_START, KEY_SELECT, 0 };
+    for (int k = 0; k < NHK; k++) if (kd & MAP[k]) g_helpHit[k] = g_t;
+    if (startTap) g_helpHit[HK_START] = g_t;
+    if (kd & KEY_B) { g_helpHit[HK_B] = g_t; go_back(); return; }
+    if (kd & KEY_TOUCH) {
+        if (hit(&B_BACK, x, y)) { press(&B_BACK, x, y); go_back(); }
+        else { g_helpHit[HK_TOUCH] = g_t; add_lock(x, y); }
+    }
 }
 
 static void handle_input(const PlayerInfo* pi) {
@@ -1515,6 +1700,7 @@ static void handle_input(const PlayerInfo* pi) {
      *   MENU       : UP/DOWN · A open · B close
      *   OPTIONS    : UP/DOWN · LEFT/RIGHT or A change · B back
      *   ABOUT      : B back */
+    if (g_mode == M_HELP) { help_input(kd, startTap, x, y); return; }
     if (startTap) { if (g_mode == M_MENU) set_mode(M_CTRL); else { open_menu(); } return; }
     if (kd & KEY_X) {
         if (g_mode == M_HIST) set_mode(M_CTRL);
@@ -1977,7 +2163,9 @@ int main(int argc, char** argv) {
         C3D_FrameBegin(C3D_FRAME_SYNCDRAW);
         C2D_TargetClear(g_top, COL_BG);
         C2D_SceneBegin(g_top);
-        if (g_mode == M_HIST && g_t - g_modeT >= HIST_OPEN_DROP + HIST_OPEN_RISE) render_top_hist(); else render_top(&pi);
+        if (g_mode == M_HIST && g_t - g_modeT >= HIST_OPEN_DROP + HIST_OPEN_RISE) render_top_hist();
+        else if (g_mode == M_HELP) render_top_help();
+        else render_top(&pi);
         C2D_TargetClear(g_bot, COL_BG);
         C2D_SceneBegin(g_bot);
         render_bottom(&pi);
