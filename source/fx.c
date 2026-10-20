@@ -147,10 +147,16 @@ float text_fit(const char* s, float maxSc, float maxW) {
 }
 
 /* next character: ASCII as is, Ñ -> 0x100, ñ -> 0x101, any other UTF-8 sequence -> '?' */
+/* capital vowels with an acute accent (Á É Í Ó Ú): second UTF-8 byte after 0xC3, drawn as the plain
+   capital plus a 2-row accent above, like the Ñ */
+static const unsigned char ACUTE_UTF8[5] = { 0x81, 0x89, 0x8D, 0x93, 0x9A };
+static const char ACUTE_BASE[5] = { 'A', 'E', 'I', 'O', 'U' };
+
 static unsigned mono_next(const unsigned char** pp) {
     const unsigned char* p = *pp;
     if (*p < 0x80) { *pp = p + 1; return *p; }
     if (p[0] == 0xC3 && (p[1] == 0x91 || p[1] == 0xB1)) { *pp = p + 2; return p[1] == 0x91 ? 0x100 : 0x101; }
+    if (p[0] == 0xC3) for (int i = 0; i < 5; i++) if (p[1] == ACUTE_UTF8[i]) { *pp = p + 2; return 0x102 + i; }
     *pp = p + 1;
     while (**pp && (**pp & 0xC0) == 0x80) (*pp)++;
     return '?';
@@ -161,6 +167,7 @@ bool mono_ok(const char* s) {
     while (*p) {
         if (*p < 0x80) { p++; continue; }
         if (p[0] == 0xC3 && (p[1] == 0x91 || p[1] == 0xB1)) { p += 2; continue; }
+        if (p[0] == 0xC3 && memchr(ACUTE_UTF8, p[1], 5)) { p += 2; continue; }
         return false;
     }
     return true;
@@ -198,6 +205,12 @@ float mono_draw(const char* s, float x, float y, int sc, u32 col, int align) {
             /* N / n with a tilde above (capitals start on row 1, small letters lower) */
             mono_rows(MONO5x8[(c == 0x100 ? 'N' : 'n') - 32], 0, 8, x, y, sc, col);
             mono_rows(TILDE, c == 0x100 ? -2 : 0, 2, x, y, sc, col);
+            continue;
+        }
+        if (c >= 0x102 && c <= 0x106) {
+            static const unsigned char ACUTE[2] = { 0x02, 0x04 };   /* pixel ´ */
+            mono_rows(MONO5x8[ACUTE_BASE[c - 0x102] - 32], 0, 8, x, y, sc, col);
+            mono_rows(ACUTE, -2, 2, x, y, sc, col);
             continue;
         }
         if (c < 32 || c > 126) c = '?';
