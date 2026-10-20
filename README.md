@@ -31,7 +31,8 @@ Radio Neon convierte tu 3DS en una radio de emisoras japonesas: J-POP, anime, ci
 - **MP3 y AAC / AAC+ (HE-AAC)** por `http://` y `https://`, con el título de la canción en directo (metadatos ICY, también en japonés).
 - **HTTPS verificado** con los certificados raíz de Mozilla incluidos en la app.
 - **Nunca se rinde:** si se corta la emisora o el Wi-Fi, vuelve a conectar sola. Mientras tanto te dice el motivo real (sin Wi-Fi, el servidor no responde, HTTP 404…) y cuánto falta para el siguiente intento.
-- **Favoritas** (Y o tocando la estrella) y **modo aleatorio**: NEXT salta a una emisora al azar sin repetir las últimas.
+- **Favoritas** (Y o tocando la estrella) y **aleatorio** (L o su botón): NEXT salta a una emisora al azar sin repetir las últimas.
+- **Temporizador de apagado** (R o su botón): 15, 30, 60, 90 minutos o los que quieras; la radio baja el volumen poco a poco y se para sola. Con la tapa cerrada, la consola se va a dormir.
 - **Osciloscopio y espectro** del audio que suena, con detector de ritmo.
 - **Tapa cerrada + auriculares:** sigue sonando con las pantallas apagadas. Si quitas los auriculares, se para; nunca suena por los altavoces con la tapa cerrada.
 - Pulsar **HOME**, cerrar la tapa y volver: la radio vuelve a conectar sola.
@@ -59,11 +60,12 @@ Necesitas una 3DS / 2DS / New 3DS con CFW (Luma3DS) y Wi-Fi configurado.
 
 | Pantalla | Botones |
 |---|---|
-| En todas | **START** salir (pregunta antes) · **L / R** emisora anterior / siguiente |
-| Principal | **A** reproducir / parar · **Y** favorita · **X** menú · **SELECT** lista de emisoras · **← / →** anterior / siguiente |
+| En todas | **START** salir (pregunta antes) · **L / R** emisora anterior / siguiente (salvo en la principal) |
+| Principal | **A** reproducir / parar · **Y** favorita · **X** menú · **SELECT** lista de emisoras · **← / →** anterior / siguiente · **L** aleatorio · **R** temporizador |
 | Lista de emisoras | **↑ / ↓** moverse · **← / →** pasar página · **A** reproducir · **Y** favorita · **B** volver · **SELECT** recargar `stations.txt` |
 | Menú | **↑ / ↓** · **A** abrir · **B** o **X** cerrar |
 | Opciones | **↑ / ↓** · **← / →** o **A** cambiar · **B** volver |
+| Temporizador | **↑ / ↓** · **A** elegir · **B** volver |
 | Acerca de | **B** volver |
 
 Todo se puede hacer también con la pantalla táctil. El volumen se controla con el deslizador de la consola.
@@ -108,7 +110,8 @@ Radio Neon turns your 3DS into a radio for Japanese stations: J-POP, anime, city
 - **MP3 and AAC / AAC+ (HE-AAC)** over `http://` and `https://`, with the live song title (ICY metadata, Japanese included).
 - **Verified HTTPS** with the Mozilla root certificates bundled in the app.
 - **Never gives up:** if the stream or the Wi-Fi drops, it reconnects by itself. Meanwhile it shows the real reason (no Wi-Fi, server not responding, HTTP 404…) and a countdown to the next try.
-- **Favourites** (Y or tap the star) and **shuffle**: NEXT jumps to a random station without repeating the last ones.
+- **Favourites** (Y or tap the star) and **shuffle** (L or its button): NEXT jumps to a random station without repeating the last ones.
+- **Sleep timer** (R or its button): 15, 30, 60, 90 minutes or any time you like; the radio fades out and stops by itself. With the lid closed, the console then goes to sleep.
 - **Oscilloscope and spectrum** of what is playing, with a beat detector.
 - **Lid closed + headphones:** keeps playing with the screens off. Unplug the headphones and it stops; it never plays through the speakers with the lid closed.
 - Press **HOME**, or close the lid and come back: the radio reconnects by itself.
@@ -136,11 +139,12 @@ You need a 3DS / 2DS / New 3DS with CFW (Luma3DS) and Wi-Fi set up.
 
 | Screen | Buttons |
 |---|---|
-| Everywhere | **START** exit (asks first) · **L / R** previous / next station |
-| Main | **A** play / stop · **Y** favourite · **X** menu · **SELECT** station list · **← / →** previous / next |
+| Everywhere | **START** exit (asks first) · **L / R** previous / next station (except on the main screen) |
+| Main | **A** play / stop · **Y** favourite · **X** menu · **SELECT** station list · **← / →** previous / next · **L** shuffle · **R** sleep timer |
 | Station list | **↑ / ↓** move · **← / →** page · **A** play · **Y** favourite · **B** back · **SELECT** reload `stations.txt` |
 | Menu | **↑ / ↓** · **A** open · **B** or **X** close |
 | Options | **↑ / ↓** · **← / →** or **A** change · **B** back |
+| Sleep timer | **↑ / ↓** · **A** choose · **B** back |
 | About | **B** back |
 
 Everything also works with the touch screen. Volume is the console's slider.

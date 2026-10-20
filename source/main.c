@@ -35,7 +35,7 @@
 static C3D_RenderTarget *g_top, *g_bot;
 static float g_t;
 static int   g_sel = 0, g_playing = -1;   /* g_sel = current station (playing, or the last one played) */
-enum { M_CTRL = 0, M_LIST, M_MENU, M_OPT, M_ABOUT };
+enum { M_CTRL = 0, M_LIST, M_MENU, M_OPT, M_ABOUT, M_SLEEP };
 static int   g_mode = M_CTRL;
 static int   g_view[MAX_STATIONS], g_viewN = 0, g_cur = 0;   /* list view (all or favourites) */
 static bool  g_favView = false;
@@ -138,6 +138,40 @@ static void play_station(int i) {
 }
 
 static void stop_station(void) { player_stop(); g_playing = -1; }
+
+/* sleep timer: the radio stops by itself, fading out over the last 10 s. With the lid closed the
+ * console then goes to sleep on its own (power_update: nothing playing -> sleep allowed). */
+#define SLEEP_FADE_MS 10000
+static u64 g_sleepEnd = 0;   /* osGetTime() when it stops, 0 = off */
+static int g_sleepSet = 0;   /* minutes chosen, to mark the row in the timer screen */
+
+static void sleep_set(int minutes) {
+    g_sleepSet = minutes;
+    g_sleepEnd = minutes > 0 ? osGetTime() + (u64)minutes * 60000 : 0;
+    player_set_volume(1.0f);
+    netlog("sleep timer: %d min", minutes);
+}
+
+static void sleep_update(void) {
+    if (!g_sleepEnd) return;
+    u64 now = osGetTime();
+    if (now >= g_sleepEnd) {
+        netlog("sleep timer: time is up%s", g_playing >= 0 ? ", stopping" : "");
+        stop_station();
+        g_sleepEnd = 0; g_sleepSet = 0;
+        player_set_volume(1.0f);
+        return;
+    }
+    u64 left = g_sleepEnd - now;
+    if (left < SLEEP_FADE_MS) player_set_volume((float)left / SLEEP_FADE_MS);
+}
+
+static void sleep_left_str(char* out, size_t n) {
+    u64 now = osGetTime();
+    u64 left = g_sleepEnd > now ? (g_sleepEnd - now + 999) / 1000 : 0;
+    if (left >= 3600) snprintf(out, n, "%d:%02d:%02d", (int)(left / 3600), (int)(left / 60 % 60), (int)(left % 60));
+    else snprintf(out, n, "%02d:%02d", (int)(left / 60), (int)(left % 60));
+}
 
 static bool in_recent(int st, int depth) {
     for (int k = g_histN - 1; k >= 0 && k >= g_histN - depth; k--) if (g_hist[k] == st) return true;
@@ -382,7 +416,8 @@ static void render_top(const PlayerInfo* pi) {
 /* --------------------------------------------------------------- bottom screen */
 typedef struct { float x, y, w, h, press; } Btn;
 static Btn B_CARD = { 10, 24, 300, 62, 0 }, B_CSTAR = { 266, 24, 44, 62, 0 };   /* star: right column of the card */
-static Btn B_PREV = { 10, 98, 84, 82, 0 }, B_PLAY = { 104, 98, 112, 82, 0 }, B_NEXT = { 226, 98, 84, 82, 0 };
+static Btn B_SHUF = { 10, 93, 146, 19, 0 }, B_SLEEP = { 164, 93, 146, 19, 0 };  /* chips row (room for a third one in the middle) */
+static Btn B_PREV = { 10, 118, 84, 68, 0 }, B_PLAY = { 104, 118, 112, 68, 0 }, B_NEXT = { 226, 118, 84, 68, 0 };
 static Btn B_MENU = { 10, 194, 146, 36, 0 }, B_EXIT = { 164, 194, 146, 36, 0 };
 static Btn B_BACK = { 8, 6, 76, 20, 0 };
 static Btn B_DOK = { 44, 128, 112, 36, 0 }, B_DNO = { 164, 128, 112, 36, 0 };
@@ -391,10 +426,34 @@ static Btn B_DOK = { 44, 128, 112, 36, 0 }, B_DNO = { 164, 128, 112, 36, 0 };
 #define MENU_Y 36
 #define MENU_H 46
 #define NMENU 4
-#define NOPT 7
-enum { OPT_ACCENT, OPT_LANG, OPT_SHUFFLE, OPT_LID, OPT_AUTO, OPT_SCAN, OPT_GLITCH };
-static const float OPT_Y[NOPT] = { 31, 72, 100, 128, 156, 184, 212 };
-static const float OPT_H[NOPT] = { 41, 28, 28, 28, 28, 28, 28 };
+#define NOPT 6
+enum { OPT_ACCENT, OPT_LANG, OPT_LID, OPT_AUTO, OPT_SCAN, OPT_GLITCH };
+static const float OPT_Y[NOPT] = { 31, 74, 106, 138, 170, 202 };
+static const float OPT_H[NOPT] = { 41, 30, 30, 30, 30, 30 };
+#define NSLEEP 6
+static const int SLEEP_MIN[NSLEEP] = { 0, 15, 30, 60, 90, -1 };   /* -1 = custom (keyboard) */
+#define SLEEP_Y(i) (LIST_Y + 22 + (i) * 30)
+
+/* shuffle: two crossing arrows */
+static void icon_shuffle(float cx, float cy, float s, u32 c) {
+    C2D_DrawLine(cx - s, cy - s * 0.55f, c, cx + s * 0.55f, cy + s * 0.55f, c, 1.6f, 0);
+    C2D_DrawLine(cx - s, cy + s * 0.55f, c, cx + s * 0.55f, cy - s * 0.55f, c, 1.6f, 0);
+    for (int k = -1; k <= 1; k += 2) {
+        float ty = cy + k * s * 0.55f;
+        C2D_DrawTriangle(cx + s, ty, c, cx + s * 0.45f, ty - 3.5f, c, cx + s * 0.45f, ty + 3.5f, c, 0);
+    }
+}
+
+/* sleep timer: clock face with hands */
+static void icon_timer(float cx, float cy, float r, u32 c) {
+    for (int i = 0; i < 24; i++) {
+        float a0 = i * (float)M_PI / 12, a1 = (i + 1) * (float)M_PI / 12;
+        C2D_DrawLine(cx + cosf(a0) * r, cy + sinf(a0) * r, c, cx + cosf(a1) * r, cy + sinf(a1) * r, c, 1.4f, 0);
+    }
+    C2D_DrawRectSolid(cx - 2, cy - r - 3, 0, 4, 2, c);
+    C2D_DrawLine(cx, cy, c, cx, cy - r * 0.65f, c, 1.4f, 0);
+    C2D_DrawLine(cx, cy, c, cx + r * 0.5f, cy, c, 1.4f, 0);
+}
 
 static bool hit(const Btn* b, int x, int y) { return x >= b->x && x < b->x + b->w && y >= b->y && y < b->y + b->h; }
 
@@ -516,18 +575,40 @@ static void render_controls(const PlayerInfo* pi) {
         mono_draw(host, c->x + 12, c->y + 48, 1, COL_DIM, 0);
         lbl(T(S_CARD_LIST), rx - 10, c->y + 48, 1, COL_ACC, 2);
     }
+    /* chips: shuffle (L) and sleep timer (R) */
+    {
+        bool on = g_cfg.shuffle;
+        Btn* b = &B_SHUF;
+        u32 col = b->press > 0.35f ? COL_BLACK : (on ? COL_ACC : COL_DIM);
+        ch_fill(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, b->press > 0.35f ? COL_ACC : COL_CARBON);
+        ch_outline(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, on ? COL_ACC : COL_LINE, 1);
+        icon_shuffle(b->x + 16, b->y + 9.5f, 6, col);
+        float tx = lbl(T(S_CHIP_SHUFFLE), b->x + 30, b->y + 6, 1, col, 0);
+        mono_draw(on ? "ON" : "OFF", b->x + 30 + tx + 8, b->y + 6, 1, col, 0);
+
+        on = g_sleepEnd != 0;
+        b = &B_SLEEP;
+        col = b->press > 0.35f ? COL_BLACK : (on ? COL_ACC : COL_DIM);
+        ch_fill(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, b->press > 0.35f ? COL_ACC : COL_CARBON);
+        ch_outline(b->x, b->y, b->w, b->h, 5, CUT_TL | CUT_BR, on ? COL_ACC : COL_LINE, 1);
+        icon_timer(b->x + 16, b->y + 10, 5, col);
+        tx = lbl(T(on ? S_CHIP_SLEEP_ON : S_CHIP_SLEEP_OFF), b->x + 30, b->y + 6, 1, col, 0);
+        char left[16] = "OFF";
+        if (on) sleep_left_str(left, sizeof(left));
+        mono_draw(left, b->x + 30 + tx + 8, b->y + 6, 1, col, 0);
+    }
     /* transport */
     hud_button(&B_PREV, CUT_TL | CUT_BL, false);
-    icon_skip(B_PREV.x + B_PREV.w / 2, B_PREV.y + 34, -1, B_PREV.press > 0.35f ? COL_BLACK : COL_ACC);
-    mono_draw("PREV", B_PREV.x + B_PREV.w / 2, B_PREV.y + 62, 1, B_PREV.press > 0.35f ? COL_BLACK : COL_DIM, 1);
+    icon_skip(B_PREV.x + B_PREV.w / 2, B_PREV.y + 28, -1, B_PREV.press > 0.35f ? COL_BLACK : COL_ACC);
+    mono_draw("PREV", B_PREV.x + B_PREV.w / 2, B_PREV.y + 54, 1, B_PREV.press > 0.35f ? COL_BLACK : COL_DIM, 1);
     hud_button(&B_NEXT, CUT_TR | CUT_BR, false);
-    icon_skip(B_NEXT.x + B_NEXT.w / 2, B_NEXT.y + 34, 1, B_NEXT.press > 0.35f ? COL_BLACK : COL_ACC);
-    mono_draw(g_cfg.shuffle ? "RANDOM" : "NEXT", B_NEXT.x + B_NEXT.w / 2, B_NEXT.y + 62, 1,
+    icon_skip(B_NEXT.x + B_NEXT.w / 2, B_NEXT.y + 28, 1, B_NEXT.press > 0.35f ? COL_BLACK : COL_ACC);
+    mono_draw(g_cfg.shuffle ? "RANDOM" : "NEXT", B_NEXT.x + B_NEXT.w / 2, B_NEXT.y + 54, 1,
               B_NEXT.press > 0.35f ? COL_BLACK : (g_cfg.shuffle ? COL_ACC : COL_DIM), 1);
     hud_button(&B_PLAY, CUT_TL | CUT_BR, true);
-    icon_playstop(B_PLAY.x + B_PLAY.w / 2, B_PLAY.y + 34, g_morph, COL_BLACK);
+    icon_playstop(B_PLAY.x + B_PLAY.w / 2, B_PLAY.y + 28, g_morph, COL_BLACK);
     const char* pl = pi->state == PS_PLAYING ? "STOP" : (pi->state == PS_STOPPED || pi->state == PS_ERROR) ? "PLAY" : "LINK...";
-    mono_draw(pl, B_PLAY.x + B_PLAY.w / 2, B_PLAY.y + 62, 1, COL_BLACK, 1);
+    mono_draw(pl, B_PLAY.x + B_PLAY.w / 2, B_PLAY.y + 54, 1, COL_BLACK, 1);
     if (pi->state == PS_CONNECTING || pi->state == PS_BUFFERING || pi->state == PS_RECONNECTING) {
         float p = fmodf(g_t * 1.5f, 1.0f);
         C2D_DrawRectSolid(B_PLAY.x + 10, B_PLAY.y + B_PLAY.h - 5, 0, (B_PLAY.w - 20) * p, 2, COL_BLACK);
@@ -668,7 +749,7 @@ static void render_options(void) {
     sub_header(T(S_HDR_OPT), "設定", "CONFIG.INI");
     dashed_vline(5, LIST_Y, SCR_H, 3, 3, COL_LINE);
     C2D_DrawRectSolid(4, g_selY + 7, 0, 3, OPT_H[g_optCur] - 14, COL_ACC);
-    static const StrId LABEL[NOPT] = { S_OPT_ACCENT, S_OPT_LANG, S_OPT_SHUFFLE, S_OPT_LID, S_OPT_AUTO, S_OPT_SCAN, S_OPT_GLITCH };
+    static const StrId LABEL[NOPT] = { S_OPT_ACCENT, S_OPT_LANG, S_OPT_LID, S_OPT_AUTO, S_OPT_SCAN, S_OPT_GLITCH };
     bool hs = osIsHeadsetConnected();
     for (int i = 0; i < NOPT; i++) {
         float y = OPT_Y[i], h = OPT_H[i];
@@ -705,7 +786,6 @@ static void render_options(void) {
         }
         bool on = false;
         switch (i) {
-            case OPT_SHUFFLE: snprintf(sb, sizeof(sb), "%s", T(S_OPTS_SHUFFLE)); on = g_cfg.shuffle; break;
             case OPT_LID:     snprintf(sb, sizeof(sb), T(S_OPTS_LID), T(hs ? S_HS_YES : S_HS_NO)); on = g_cfg.lidPlay; break;
             case OPT_AUTO:    snprintf(sb, sizeof(sb), "%s", T(S_OPTS_AUTO)); on = g_cfg.autoplay; break;
             case OPT_SCAN:    snprintf(sb, sizeof(sb), "%s", T(S_OPTS_SCAN)); on = g_cfg.scanlines; break;
@@ -822,6 +902,41 @@ static void render_dialog(void) {
     lbl(T(S_DLG_NO), B_DNO.x + B_DNO.w / 2, B_DNO.y + 14, 1, B_DNO.press > 0.35f ? COL_BLACK : COL_TEXT, 1);
 }
 
+/* ---------------- sleep timer */
+static int g_sleepCur = 0;
+
+static bool sleep_row_is_current(int i) {
+    if (SLEEP_MIN[i] == 0) return !g_sleepEnd;
+    if (!g_sleepEnd) return false;
+    if (SLEEP_MIN[i] > 0) return g_sleepSet == SLEEP_MIN[i];
+    for (int k = 0; k < NSLEEP; k++) if (SLEEP_MIN[k] == g_sleepSet) return false;
+    return true;   /* custom */
+}
+
+static void render_sleep(void) {
+    spring_to(SLEEP_Y(g_sleepCur) - LIST_Y);
+    char left[16] = "OFF";
+    if (g_sleepEnd) sleep_left_str(left, sizeof(left));
+    sub_header(T(S_HDR_SLEEP), "スリープ", left);
+    lbl(T(S_SLEEP_SUB), 160, LIST_Y + 8, 1, COL_DIM, 1);
+    dashed_vline(5, LIST_Y + 18, SCR_H, 3, 3, COL_LINE);
+    C2D_DrawRectSolid(4, LIST_Y + g_selY + 8, 0, 3, 12, COL_ACC);
+    for (int i = 0; i < NSLEEP; i++) {
+        float y = SLEEP_Y(i);
+        bool sel = i == g_sleepCur, cur = sleep_row_is_current(i);
+        ch_fill(12, y + 1, 296, 27, 6, CUT_TL | CUT_BR, sel ? COL_CARBON : COL_PANEL);
+        ch_outline(12, y + 1, 296, 27, 6, CUT_TL | CUT_BR, sel ? COL_ACC : COL_LINE, 1);
+        char t[48];
+        if (SLEEP_MIN[i] == 0) snprintf(t, sizeof(t), "%s", T(S_SLEEP_OFF));
+        else if (SLEEP_MIN[i] > 0) snprintf(t, sizeof(t), T(S_SLEEP_MIN), SLEEP_MIN[i]);
+        else if (cur) snprintf(t, sizeof(t), "%s (%d min)", T(S_SLEEP_CUSTOM), g_sleepSet);
+        else snprintf(t, sizeof(t), "%s...", T(S_SLEEP_CUSTOM));
+        text_draw(t, 22, y + 6, 0.5f, sel ? COL_TEXT : col_a(COL_TEXT, 0.75f), 0);
+        if (cur && g_sleepEnd) { char l[32]; snprintf(l, sizeof(l), T(S_SLEEP_LEFT), left); lbl(l, 300, y + 11, 1, COL_ACC, 2); }
+        else if (cur) mono_draw("OK", 300, y + 11, 1, COL_ACC, 2);
+    }
+}
+
 static void render_bottom(const PlayerInfo* pi) {
     C2D_DrawRectSolid(0, 0, 0, BOT_W, SCR_H, COL_BG);
     dot_matrix(BOT_W);
@@ -831,6 +946,7 @@ static void render_bottom(const PlayerInfo* pi) {
         case M_LIST: render_list(pi); break;
         case M_MENU: render_menu(); break;
         case M_OPT: render_options(); break;
+        case M_SLEEP: render_sleep(); break;
         default: render_about(); break;
     }
     if (g_dialog) render_dialog();
@@ -930,7 +1046,6 @@ static void opt_change(int i, int dir) {
     switch (i) {
         case OPT_ACCENT:  g_cfg.accent = ((g_cfg.accent + dir) % NUM_ACCENTS + NUM_ACCENTS) % NUM_ACCENTS; config_apply_accent(); break;
         case OPT_LANG:    g_cfg.lang = ((g_cfg.lang + dir) % NUM_LANGSEL + NUM_LANGSEL) % NUM_LANGSEL; i18n_resolve(g_cfg.lang); break;
-        case OPT_SHUFFLE: g_cfg.shuffle = !g_cfg.shuffle; g_histN = 0; break;
         case OPT_LID:     g_cfg.lidPlay = !g_cfg.lidPlay; break;
         case OPT_AUTO:    g_cfg.autoplay = !g_cfg.autoplay; break;
         case OPT_SCAN:    g_cfg.scanlines = !g_cfg.scanlines; break;
@@ -939,12 +1054,42 @@ static void opt_change(int i, int dir) {
     config_save();
 }
 
+static void open_sleep(void) {
+    g_sleepCur = 0;
+    for (int i = 0; i < NSLEEP; i++) if (sleep_row_is_current(i)) g_sleepCur = i;
+    g_selY = SLEEP_Y(g_sleepCur) - LIST_Y; g_selV = 0;
+    set_mode(M_SLEEP);
+}
+
+/* custom minutes on the system numpad (called from handle_input, outside the frame) */
+static void sleep_custom(void) {
+    SwkbdState kb;
+    char buf[8] = "";
+    swkbdInit(&kb, SWKBD_TYPE_NUMPAD, 2, 3);
+    swkbdSetHintText(&kb, T(S_SLEEP_KB));
+    swkbdSetValidation(&kb, SWKBD_NOTEMPTY_NOTBLANK, 0, 0);
+    if (swkbdInputText(&kb, buf, sizeof(buf)) != SWKBD_BUTTON_CONFIRM) return;
+    int m = atoi(buf);
+    if (m < 1) m = 1;
+    if (m > 480) m = 480;
+    sleep_set(m);
+    set_mode(M_CTRL);
+}
+
+static void sleep_select(int i) {
+    if (SLEEP_MIN[i] < 0) { sleep_custom(); return; }
+    sleep_set(SLEEP_MIN[i]);
+    set_mode(M_CTRL);
+}
+
+static void toggle_shuffle(void) { g_cfg.shuffle = !g_cfg.shuffle; g_histN = 0; config_save(); }
+
 static void to_menu(void) { g_selY = g_menuCur * MENU_H; g_selV = 0; set_mode(M_MENU); }
 
 static void go_back(void) {
     if (g_mode == M_LIST) { if (g_listFrom == M_MENU) to_menu(); else set_mode(M_CTRL); }
     else if (g_mode == M_OPT || g_mode == M_ABOUT) to_menu();
-    else if (g_mode == M_MENU) set_mode(M_CTRL);
+    else if (g_mode == M_MENU || g_mode == M_SLEEP) set_mode(M_CTRL);
 }
 
 static void handle_input(const PlayerInfo* pi) {
@@ -966,16 +1111,23 @@ static void handle_input(const PlayerInfo* pi) {
         return;
     }
     /* Buttons (each one does one thing, only where it makes sense):
-     *   everywhere : START exit dialog · L / R previous / next station (or random with shuffle)
-     *   CTRL       : A play/stop · Y favourite · X menu · LEFT/RIGHT previous / next
+     *   everywhere : START exit dialog · L / R previous / next station (or random with shuffle), except in CTRL
+     *   CTRL       : A play/stop · Y favourite · X menu · SELECT list · LEFT/RIGHT previous / next
+     *                L shuffle on/off · R sleep timer (the chips under the card, same sides)
+     *   SLEEP      : UP/DOWN · A choose · B back
      *   LIST       : UP/DOWN move · LEFT/RIGHT page · A play · Y favourite · B back · SELECT reload stations.txt
      *   MENU       : UP/DOWN · A open · B or X close
      *   OPTIONS    : UP/DOWN · LEFT/RIGHT or A change · B back
      *   ABOUT      : B back */
     if (kd & KEY_START) { open_dialog(); return; }
-    if (kd & KEY_L) step_station(-1);
-    if (kd & KEY_R) step_station(1);
-    if (kd & (KEY_L | KEY_R)) list_sync_cursor();
+    if (g_mode == M_CTRL) {
+        if (kd & KEY_L) { B_SHUF.press = 1; toggle_shuffle(); }
+        if (kd & KEY_R) { B_SLEEP.press = 1; open_sleep(); return; }
+    } else if (g_mode != M_SLEEP) {
+        if (kd & KEY_L) step_station(-1);
+        if (kd & KEY_R) step_station(1);
+        if (kd & (KEY_L | KEY_R)) list_sync_cursor();
+    }
 
     int vert = 0;
     if (kd & (KEY_DUP | KEY_CPAD_UP)) { vert = -1; repeat = 0; }
@@ -1021,6 +1173,11 @@ static void handle_input(const PlayerInfo* pi) {
             if (vert) g_optCur = (g_optCur + vert + NOPT) % NOPT;
             if (horiz) opt_change(g_optCur, horiz);
             break;
+        case M_SLEEP:
+            if (kd & KEY_A) sleep_select(g_sleepCur);
+            if (kd & KEY_B) go_back();
+            if (vert) g_sleepCur = (g_sleepCur + vert + NSLEEP) % NSLEEP;
+            break;
         default:
             if (kd & KEY_B) go_back();
             break;
@@ -1034,6 +1191,8 @@ static void handle_input(const PlayerInfo* pi) {
             else if (hit(&B_PREV, x, y)) { press(&B_PREV, x, y); step_station(-1); }
             else if (hit(&B_NEXT, x, y)) { press(&B_NEXT, x, y); step_station(1); }
             else if (hit(&B_CSTAR, x, y)) { press(&B_CSTAR, x, y); toggle_fav(g_sel); }
+            else if (hit(&B_SHUF, x, y)) { press(&B_SHUF, x, y); toggle_shuffle(); }
+            else if (hit(&B_SLEEP, x, y)) { press(&B_SLEEP, x, y); open_sleep(); }
             else if (hit(&B_CARD, x, y)) { press(&B_CARD, x, y); open_list(false, M_CTRL); }
             else if (hit(&B_MENU, x, y)) { press(&B_MENU, x, y); g_menuCur = 0; g_selY = 0; g_selV = 0; set_mode(M_MENU); }
             else if (hit(&B_EXIT, x, y)) { press(&B_EXIT, x, y); open_dialog(); }
@@ -1050,6 +1209,12 @@ static void handle_input(const PlayerInfo* pi) {
                 if (i == OPT_ACCENT && y >= OPT_Y[0] + 18 && x >= 20 && x < 20 + NUM_ACCENTS * 24) {
                     g_cfg.accent = (x - 20) / 24; config_apply_accent(); config_save();
                 } else opt_change(i, 1);
+                break;
+            }
+        } else if (g_mode == M_SLEEP) {
+            for (int i = 0; i < NSLEEP; i++) {
+                if (y < SLEEP_Y(i) || y >= SLEEP_Y(i) + 29) continue;
+                add_lock(x, y); g_sleepCur = i; sleep_select(i);
                 break;
             }
         } else if (g_mode == M_ABOUT) { add_lock(x, y); }
@@ -1259,6 +1424,7 @@ int main(int argc, char** argv) {
     while (aptMainLoop() && !g_quit) {
         g_t = (osGetTime() - t0) / 1000.0f;
         hidScanInput();
+        sleep_update();
         player_get_info(&pi);
         if (power_update(&pi)) { gspWaitForVBlank(); continue; }   /* lid closed: dark, audio only */
         handle_input(&pi);
@@ -1266,8 +1432,8 @@ int main(int argc, char** argv) {
 
         float target = (pi.state == PS_STOPPED || pi.state == PS_ERROR) ? 0 : 1;
         g_morph += (target - g_morph) * 0.2f;
-        Btn* bs[] = { &B_PREV, &B_NEXT, &B_PLAY, &B_MENU, &B_EXIT, &B_CARD, &B_BACK, &B_CSTAR, &B_DOK, &B_DNO };
-        for (int i = 0; i < 10; i++) bs[i]->press *= 0.82f;
+        Btn* bs[] = { &B_PREV, &B_NEXT, &B_PLAY, &B_MENU, &B_EXIT, &B_CARD, &B_BACK, &B_CSTAR, &B_DOK, &B_DNO, &B_SHUF, &B_SLEEP };
+        for (int i = 0; i < 12; i++) bs[i]->press *= 0.82f;
 
         float nb[NBANDS];
         player_get_spectrum(nb, NBANDS);

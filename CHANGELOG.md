@@ -22,7 +22,9 @@
 - HTTPS con verificación de certificados (raíces de Mozilla).
 - La red se reintenta sola sin límite y muestra el motivo real y la cuenta atrás.
 - `net.log` en la SD para diagnosticar.
-- Opción **Aleatorio**: NEXT salta a una emisora al azar.
+- **Aleatorio** en la pantalla principal (botón o L): NEXT salta a una emisora al azar.
+- **Temporizador de apagado** (botón o R): 15, 30, 60, 90 minutos o personalizado, con fundido de 10 s al final.
+- SELECT abre la lista de emisoras.
 - Controles revisados: cada botón hace una sola cosa y solo donde tiene sentido.
 - «Acerca de» con QR de GitHub, Discord y Ko-fi y créditos que suben.
 - Datos reales en el HUD (servidor, HTTP/HTTPS, códec y bitrate, bytes reales del stream) en lugar de frecuencias inventadas.
