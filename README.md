@@ -58,7 +58,7 @@ Necesitas una 3DS / 2DS / New 3DS con CFW (Luma3DS) y Wi-Fi configurado.
 
 | Pantalla | Botones |
 |---|---|
-| En todas | **START** abre / cierra el menú · **START mantenido 2 s** salir (pregunta antes) · **X** abre / cierra el historial · **SELECT** abre / cierra la lista de emisoras · **L / R** emisora anterior / siguiente (salvo en la principal) |
+| En todas | **START** abre / cierra el menú · **START mantenido 2 s** salir (pregunta antes) · **X** abre / cierra el historial · **SELECT** abre / cierra la lista de emisoras · **L / R** emisora anterior / siguiente (en la lista, el menú, Opciones y Acerca de) |
 | Principal | **A** reproducir / parar · **Y** favorita · **← / →** anterior / siguiente · **L** aleatorio · **R** temporizador · **B** guardar / quitar la canción que suena |
 | Lista de emisoras | **↑ / ↓** moverse · **← / →** pasar página · **A** reproducir · **Y** favorita · **B** volver |
 | Menú | **↑ / ↓** · **A** abrir · **B** cerrar |
@@ -144,7 +144,7 @@ You need a 3DS / 2DS / New 3DS with CFW (Luma3DS) and Wi-Fi set up.
 
 | Screen | Buttons |
 |---|---|
-| Everywhere | **START** opens / closes the menu · **hold START 2 s** exit (asks first) · **X** opens / closes the song history · **SELECT** opens / closes the station list · **L / R** previous / next station (except on the main screen) |
+| Everywhere | **START** opens / closes the menu · **hold START 2 s** exit (asks first) · **X** opens / closes the song history · **SELECT** opens / closes the station list · **L / R** previous / next station (in the station list, the menu, Options and About) |
 | Main | **A** play / stop · **Y** favourite · **← / →** previous / next · **L** shuffle · **R** sleep timer · **B** save / unsave the song that is playing |
 | Station list | **↑ / ↓** move · **← / →** page · **A** play · **Y** favourite · **B** back |
 | Menu | **↑ / ↓** · **A** open · **B** close |
