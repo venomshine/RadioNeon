@@ -8,18 +8,8 @@ Hecho por **VENOMSHiNE** · [Discord](https://discord.com/invite/yVKp8JwV4e) · 
 
 | | | |
 |:-:|:-:|:-:|
-| ![On air](docs/screenshots/02_on_air.png) | ![Station list](docs/screenshots/03_station_list.png) | ![Song history](docs/screenshots/04_song_history.png) |
-| ON AIR | Station list / Lista | Song history + Spotify QR / Historial |
-| ![Phone page](docs/screenshots/05_phone_page.png) | ![Sleep timer](docs/screenshots/06_sleep_timer.png) | ![Low battery](docs/screenshots/11_low_battery.png) |
-| Phone page / Página del móvil | Sleep timer / Temporizador | Low battery / Batería baja |
-| ![Options](docs/screenshots/07_options.png) | ![About](docs/screenshots/08_about_qr.png) | ![Network retry](docs/screenshots/09_network_retry.png) |
-| Options / Opciones | About + QR / Acerca de | Network retry / Reintento |
-| ![Menu](docs/screenshots/12_menu.png) | ![Controls](docs/screenshots/13_controls.png) | ![Red accent](docs/screenshots/10_accent_red.png) |
-| Menu / Menú | Controls / Controles | Red accent / Rojo |
-| ![Boot](docs/screenshots/01_boot_opendsp.png) | | |
-| OpenDSP boot / Arranque | | |
-
-<sub>Capturas de la 1.1.0 en Azahar con la interfaz en inglés; el audio es una emisora de prueba local («Test Signal») · 1.1.0 screenshots in Azahar, English UI; the audio is a local test stream. Más / more: [docs/screenshots](docs/screenshots) · 1.0.0: [docs/screenshots-1.0.0](docs/screenshots-1.0.0)</sub>
+| ![On air](docs/screenshots/02_on_air.png) | ![Song history + Spotify QR](docs/screenshots/04_song_history.png) | ![Controls](docs/screenshots/13_controls.png) |
+| ON AIR | Historial + QR de Spotify / Song history | Controles / Controls |
 
 [Español](#español) · [English](#english)
 
